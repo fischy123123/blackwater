@@ -1,5 +1,5 @@
 // Minimal, diegetic-leaning interface. Everything lives in one overlay.
-import type { Input } from '../core/Input';
+import { RUN_PUSH, type Input } from '../core/Input';
 
 export type Settings = { sensitivity: number; invertY: boolean; volume: number; quality: string; subtitles: boolean };
 
@@ -128,6 +128,7 @@ export class UI {
       <div class="pause-inner">
         <div class="pause-title">Paused</div>
         <button class="btn primary" id="btn-resume">Resume</button>
+        <div class="controls" aria-label="Controls"></div>
         <div class="settings">
           <label for="set-sens">Look sensitivity <input id="set-sens" type="range" min="0.3" max="2.5" step="0.05"></label>
           <label for="set-vol">Volume <input id="set-vol" type="range" min="0" max="1" step="0.05"></label>
@@ -225,6 +226,7 @@ export class UI {
       let dx = s.x - s.ox,
         dy = s.y - s.oy;
       const d = Math.hypot(dx, dy);
+      this.stickBase.classList.toggle('run', d > R * RUN_PUSH);
       if (d > R) {
         dx = (dx / d) * R;
         dy = (dy / d) * R;
@@ -280,7 +282,7 @@ export class UI {
       return;
     }
     this.reticle.classList.add('focus');
-    const key = this.touchUI ? '' : `<span class="key">E</span>`;
+    const key = this.touchUI ? '' : `<span class="key">${this.ctl('E', 'A', '')}</span>`;
     this.prompt.innerHTML = `${key}<span class="verb">${verb ?? 'Use'}</span><span class="obj">${label}</span>`;
     this.prompt.classList.add('on');
     if (this.touchUI) {
@@ -298,6 +300,16 @@ export class UI {
     this.subs.innerHTML = speaker ? `<span class="who">${speaker}</span><span class="line">${text}</span>` : `<span class="line thought">${text}</span>`;
     this.subs.classList.add('on');
     this.subTimer = seconds;
+  }
+
+  /** Pick the wording for the device the player is using right now. */
+  ctl(keyboard: string, pad: string, touch: string) {
+    const d = this.input?.device ?? (this.touchUI ? 'touch' : 'keyboard');
+    return d === 'pad' ? pad : d === 'touch' ? touch : keyboard;
+  }
+
+  get hintShowing() {
+    return this.hintTimer > 0;
   }
 
   showHint(text: string, seconds = 5) {
@@ -347,7 +359,7 @@ export class UI {
     this.refreshPanel(items, powered);
     this.panel.classList.remove('hidden');
     requestAnimationFrame(() => this.panel.classList.add('in'));
-    (this.panel.querySelector('.doc-hint') as HTMLElement).textContent = this.touchUI ? 'Tap a breaker to flip it · tap outside to step back' : 'Click a breaker (or 1–4) to flip it · E / Esc to step back';
+    (this.panel.querySelector('.doc-hint') as HTMLElement).textContent = this.ctl('Click a breaker (or 1–4) to flip it · E / Esc to step back', 'D-pad to choose · A to flip · B to step back', 'Tap a breaker to flip it · tap outside to step back');
   }
 
   refreshPanel(items: { id: string; label: string; on: boolean; tag?: string }[], powered: boolean) {
@@ -386,7 +398,7 @@ export class UI {
   // ---------------------------------------------------------------- binoculars, credits, saved
   setBinoculars(on: boolean) {
     this.binoc.classList.toggle('hidden', !on);
-    (this.binoc.querySelector('.binoc-hint') as HTMLElement).textContent = on ? (this.touchUI ? 'Tap to lower the binoculars' : 'E to lower the binoculars') : '';
+    (this.binoc.querySelector('.binoc-hint') as HTMLElement).textContent = on ? this.ctl('E to lower the binoculars', 'A to lower the binoculars', 'Tap to lower the binoculars') : '';
     this.hud.classList.toggle('dim', on);
   }
 
@@ -435,7 +447,7 @@ export class UI {
     this.docBody.className = `doc-body ${style}`;
     this.doc.classList.remove('hidden');
     requestAnimationFrame(() => this.doc.classList.add('in'));
-    (this.doc.querySelector('.doc-hint') as HTMLElement).textContent = this.touchUI ? 'Tap outside the page to put it down' : 'E / Esc to put it down';
+    (this.doc.querySelector('.doc-hint') as HTMLElement).textContent = this.ctl('E / Esc to put it down', 'A or B to put it down', 'Tap outside the page to put it down');
     this.docOpen = true;
     this.docBody.scrollTop = 0;
   }
@@ -450,7 +462,7 @@ export class UI {
 
   toggleNotebook(open: boolean, html?: string) {
     if (open && html) {
-      this.notebook.innerHTML = `<div class="nb-page">${html}<div class="nb-close">${this.touchUI ? 'Tap to close' : 'Tab to close'}</div></div>`;
+      this.notebook.innerHTML = `<div class="nb-page">${html}<div class="nb-close">${this.ctl('Tab to close', 'Y to close', 'Tap to close')}</div></div>`;
       this.notebook.classList.remove('hidden');
       requestAnimationFrame(() => this.notebook.classList.add('in'));
     } else {
@@ -467,6 +479,20 @@ export class UI {
   showPause(on: boolean) {
     this.paused = on;
     this.pause.classList.toggle('hidden', !on);
+    if (on) {
+      const rows = this.ctl(
+        'Move|<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>;Look|mouse;Run|hold <kbd>Shift</kbd>;Use, read|<kbd>E</kbd> or click;Flashlight|<kbd>F</kbd>;Notebook|<kbd>Tab</kbd>;Crouch · jump|<kbd>C</kbd> · <kbd>Space</kbd>',
+        'Move · look|sticks;Run|hold <kbd>LT</kbd> or <kbd>LB</kbd>, or click <kbd>L3</kbd>;Use, read|<kbd>A</kbd>;Flashlight|<kbd>X</kbd>;Notebook|<kbd>Y</kbd>;Crouch|<kbd>RB</kbd>',
+        'Walk|drag on the left;Run|push the stick past its ring;Look|drag on the right;Use, read|tap the thing, or the round button',
+      );
+      (this.pause.querySelector('.controls') as HTMLElement).innerHTML = rows
+        .split(';')
+        .map((r) => {
+          const [k, v] = r.split('|');
+          return `<span>${k}</span><span>${v}</span>`;
+        })
+        .join('');
+    }
     (this.pause.querySelector('#btn-resume') as HTMLElement).textContent = this.hud.classList.contains('hidden') ? 'Back' : 'Resume';
   }
 

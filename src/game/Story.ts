@@ -147,7 +147,7 @@ export class Story {
     };
     if (!this.docs.includes(id)) {
       this.docs.push(id);
-      if (this.docs.length === 1) this.after(1.2, () => this.ui.showHint(this.ui.touchUI ? 'Your notebook (top left) keeps what you’ve read.' : '<b>Tab</b> — notebook. It keeps what you’ve read.', 6));
+      if (this.docs.length === 1) this.after(1.2, () => this.ui.showHint(this.ui.ctl('<kbd>Tab</kbd> — notebook. It keeps what you’ve read.', '<kbd>Y</kbd> — notebook. It keeps what you’ve read.', 'Your notebook (top left) keeps what you’ve read.'), 6));
     }
   }
 
@@ -713,14 +713,20 @@ export class Story {
   private beatOverlook() {
     music.cue('arrival');
     this.after(2.5, () => {
-      const t = this.ui.touchUI;
-      this.ui.showHint(t ? 'Drag on the left to walk · drag on the right to look · tap things to use them' : '<b>WASD</b> walk · <b>mouse</b> look · <b>E</b> use · <b>Shift</b> run', 8);
+      this.ui.showHint(
+        this.ui.ctl(
+          '<kbd>WASD</kbd> walk · mouse look · <kbd>E</kbd> use · hold <kbd>Shift</kbd> to run',
+          'Left stick walk · right stick look · <kbd>A</kbd> use · hold <kbd>LT</kbd> to run',
+          'Drag on the left to walk (push past the ring to run) · drag on the right to look · tap things to use them',
+        ),
+        9,
+      );
     });
     this.after(4.5, () => this.say('Blackwater. Last town on the county line.'));
     this.after(10, () => {
       this.flags.radioCalling = true;
       squelch(0.3, 0.3);
-      this.ui.showHint(this.ui.touchUI ? 'The truck radio is calling.' : 'The truck radio is calling. <b>E</b> to answer.', 5);
+      this.ui.showHint(this.ui.ctl('The truck radio is calling. <kbd>E</kbd> to answer.', 'The truck radio is calling. <kbd>A</kbd> to answer.', 'The truck radio is calling.'), 5);
     });
     this.setObjective('Blackwater relay. The hut on Hill Street.', false);
     // the tape on the way down
@@ -734,7 +740,7 @@ export class Story {
     );
     this.when(
       () => this.game.truck.pos.distanceTo(V(P.roadblock.x, this.game.truck.pos.y, P.roadblock.z)) < 38 && Math.abs(this.game.truck.speed) < 1.5 && this.game.mode === 'drive',
-      () => this.ui.showHint(this.ui.touchUI ? 'Tap <b>Get out</b> to leave the truck.' : '<b>E</b> — get out', 5),
+      () => this.ui.showHint(this.ui.ctl('<kbd>E</kbd> — get out', '<kbd>A</kbd> — get out', 'Tap <b>Get out</b> to leave the truck.'), 5),
     );
     this.when(
       () => this.game.mode === 'walk' && Math.hypot(this.player.pos.x - P.roadblock.x, this.player.pos.z - P.roadblock.z) < 34,
@@ -881,7 +887,14 @@ export class Story {
     if (this.flags.radioCalling && !this.flags.radioAnswered) this.answerDispatch();
     if (!this.flags.driveHint) {
       this.flags.driveHint = true;
-      this.ui.showHint(this.ui.touchUI ? 'Left stick: throttle and steering · drag right side to look' : '<b>W/S</b> throttle · <b>A/D</b> steer · <b>F</b> headlights · <b>E</b> get out', 7);
+      this.ui.showHint(
+        this.ui.ctl(
+          '<kbd>W</kbd><kbd>S</kbd> throttle · <kbd>A</kbd><kbd>D</kbd> steer · <kbd>F</kbd> headlights · <kbd>E</kbd> get out',
+          'Left stick: throttle and steering · <kbd>X</kbd> headlights · <kbd>A</kbd> get out',
+          'Left stick: throttle and steering · drag right side to look',
+        ),
+        7,
+      );
     }
   }
 
@@ -914,7 +927,7 @@ export class Story {
     this.player.hasFlashlight = true;
     audio.clunk(undefined, 0.3);
     this.ui.setFlashButton(true, false);
-    this.ui.showHint(this.ui.touchUI ? 'Flashlight: the button top right.' : '<b>F</b> — flashlight', 5);
+    this.ui.showHint(this.ui.ctl('<kbd>F</kbd> — flashlight', '<kbd>X</kbd> — flashlight', 'Flashlight: the button top right.'), 5);
   }
 
   private playTideTape() {
@@ -1257,7 +1270,14 @@ export class Story {
       this.player.shake = 1;
       music.cue('escape');
       this.say('It’s letting go.');
-      this.ui.showHint('<b>Run.</b> The tower — the light on the post.', 6);
+      this.ui.showHint(
+        this.ui.ctl(
+          '<b>Run</b> — hold <kbd>Shift</kbd>. The tower, the light on the post.',
+          '<b>Run</b> — hold <kbd>LT</kbd>. The tower, the light on the post.',
+          '<b>Run</b> — push the stick past its ring. The tower, the light on the post.',
+        ),
+        8,
+      );
       this.setObjective('Get up the tower.', false);
     });
     this.after(17, () => {

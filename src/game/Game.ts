@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import type { Engine } from '../core/Engine';
 import { Input } from '../core/Input';
 import type { World } from './WorldBuilder';
-import { Player, type Surface } from './Player';
+import { Player, WALK_SPEED, type Surface } from './Player';
 import { Interaction, Door } from './Interaction';
 import { Truck } from './Vehicle';
 import { Dialogue } from './Dialogue';
@@ -329,6 +329,7 @@ export class Game {
     } else if (this.mode === 'walk' || this.mode === 'cutscene') {
       this.player.baseFov = this.naturalFov(66);
       this.player.update(dt, env.preExposure);
+      this.updateRunTip(dt);
     } else if (this.mode === 'drive') {
       this.updateDrive(dt);
     } else if (this.mode === 'climb') {
@@ -373,6 +374,42 @@ export class Game {
     this.updateAudio(dt);
     this.ui.update(dt);
     this.input.endFrame();
+  }
+
+  // Until the player has run once, suggest it after a stretch of plain walking.
+  private runKnown = (() => {
+    try {
+      return localStorage.getItem('bw-ran') === '1';
+    } catch {
+      return false;
+    }
+  })();
+  private ranFor = 0;
+  private walkStreak = 0;
+  private runTipWait = 0;
+  private updateRunTip(dt: number) {
+    if (this.runKnown || this.mode !== 'walk') return;
+    const p = this.player;
+    if (p.moveSpeed > WALK_SPEED * 1.3) {
+      this.ranFor += dt;
+      if (this.ranFor > 1) {
+        this.runKnown = true;
+        try {
+          localStorage.setItem('bw-ran', '1');
+        } catch {
+          /* storage unavailable: the tip just stays eligible this session */
+        }
+      }
+      return;
+    }
+    this.runTipWait -= dt;
+    const striding = p.moveSpeed > WALK_SPEED * 0.7 && this.input.move.y > 0.5 && !this.insideId;
+    this.walkStreak = striding ? this.walkStreak + dt : Math.max(0, this.walkStreak - dt * 3);
+    if (this.walkStreak > 5 && this.runTipWait <= 0 && !this.ui.hintShowing && !this.ui.docOpen) {
+      this.ui.showHint(this.ui.ctl('Hold <kbd>Shift</kbd> to run.', 'Hold <kbd>LT</kbd> or click <kbd>L3</kbd> to run.', 'Push the stick past its ring to run.'), 5);
+      this.runTipWait = 90;
+      this.walkStreak = 0;
+    }
   }
 
   private updateDrive(dt: number) {

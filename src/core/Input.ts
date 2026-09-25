@@ -1,6 +1,9 @@
 // Unified input: keyboard + mouse (pointer lock with drag fallback), gamepad, touch.
 import * as THREE from 'three';
 
+/** How far out (in stick radii) the touch stick must be pushed to run: just past its ring. */
+export const RUN_PUSH = 1.15;
+
 export type Action = 'interact' | 'flashlight' | 'pause' | 'journal' | 'jump' | 'back' | 'photo';
 
 const KEYMAP: Record<string, Action> = {
@@ -27,6 +30,8 @@ export class Input {
   pointerLocked = false;
   lockSupported = true;
   usingGamepad = false;
+  /** The device the player used last; prompts and hints follow it. */
+  device: 'keyboard' | 'touch' | 'pad' = 'keyboard';
   private keys = new Set<string>();
   private pressedSet = new Set<Action>();
   private mouseDelta = new THREE.Vector2();
@@ -45,6 +50,7 @@ export class Input {
   constructor(el: HTMLElement) {
     this.el = el;
     this.touchMode = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+    if (this.touchMode) this.device = 'touch';
     addEventListener('keydown', (e) => {
       if (!this.enabled) return;
       if (e.code === 'Tab') e.preventDefault();
@@ -54,6 +60,7 @@ export class Input {
       }
       this.keys.add(e.code);
       this.touchMode = false;
+      this.device = 'keyboard';
       this.gesture();
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
@@ -62,6 +69,7 @@ export class Input {
     el.addEventListener('mousedown', (e) => {
       if (this.touchMode && (e as PointerEvent).pointerType === 'touch') return;
       this.gesture();
+      this.device = 'keyboard';
       if (!this.enabled) return;
       if (this.wantsLock && !this.pointerLocked && this.lockSupported) this.requestLock();
       if (!this.pointerLocked) this.dragging = true;
@@ -119,6 +127,7 @@ export class Input {
   private onTouch(e: TouchEvent, phase: 'start' | 'move' | 'end') {
     e.preventDefault();
     this.touchMode = true;
+    this.device = 'touch';
     this.gesture();
     if (!this.enabled) {
       this.stick.active = false;
@@ -222,7 +231,7 @@ export class Input {
         mx += (dx / l) * m;
         my += (-dy / l) * m;
       }
-      if (l > 1.15) this.sprint = true;
+      if (l > RUN_PUSH) this.sprint = true;
     }
     if (this.touchLook.lengthSq() > 0) {
       const ts = (2.6 / Math.max(360, Math.min(innerWidth, innerHeight))) * this.sensitivity;
@@ -239,13 +248,15 @@ export class Input {
         ly = ax(p.axes[1] ?? 0);
       const rx = ax(p.axes[2] ?? 0),
         ry = ax(p.axes[3] ?? 0);
+      const btn = (i: number) => !!p.buttons[i]?.pressed;
       if (lx || ly || rx || ry) this.usingGamepad = true;
+      // a deliberate push or press (not stick drift) makes the controller the active device
+      if (Math.max(Math.abs(lx), Math.abs(ly), Math.abs(rx), Math.abs(ry)) > 0.3 || p.buttons.some((b) => b.pressed)) this.device = 'pad';
       mx += lx;
       my += -ly;
       const curve = (v: number) => Math.sign(v) * Math.pow(Math.abs(v), 1.6);
       this.look.x += -curve(rx) * 2.6 * dt * this.sensitivity;
       this.look.y += -curve(ry) * 1.9 * dt * this.sensitivity * (this.invertY ? -1 : 1);
-      const btn = (i: number) => !!p.buttons[i]?.pressed;
       this.padEdge(0, btn(0), 'interact');
       this.padEdge(1, btn(1), 'back');
       this.padEdge(2, btn(2), 'flashlight');
