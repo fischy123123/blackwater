@@ -195,7 +195,16 @@ export class Story {
     const g = this.w.places.lhGate;
     const c = this.w.collision;
     const mid = g.pos.clone().add(V(Math.cos(g.yaw) * 2.65, 0, -Math.sin(g.yaw) * 2.65));
+    // the bar itself plus the boulder lines either side: no driving round it
     this.gateCollider = c.add({ kind: 'box', x: mid.x, z: mid.z, hw: 2.7, hd: 0.15, rot: -g.yaw, y0: g.pos.y - 1, y1: g.pos.y + 1.3, walkable: false, dynamic: true, tag: 'gate' }) as import('../world/Collision').Box;
+    const dir = V(Math.cos(g.yaw), 0, -Math.sin(g.yaw));
+    for (const [s0, s1] of [
+      [-12, -0.1],
+      [5.4, 17.5],
+    ]) {
+      const cm = g.pos.clone().addScaledVector(dir, (s0 + s1) / 2);
+      c.box(cm.x, cm.z, s1 - s0, 0.6, -g.yaw, g.pos.y - 4, g.pos.y + 1.2, false, 'rock');
+    }
     c.updateBox(this.gateCollider);
   }
 

@@ -208,7 +208,10 @@ async function boot() {
     }
     if (inp.consume('journal')) {
       if (ui.notebookOpen) ui.toggleNotebook(false);
-      else if (!ui.docOpen) story.openNotebook();
+      else if (!ui.docOpen) {
+        story.openNotebook();
+        inp.exitLock(); // pages in the notebook are clicked
+      }
     }
   });
 }

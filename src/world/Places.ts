@@ -491,9 +491,9 @@ export function buildPlaces(scene: THREE.Scene, collision: CollisionWorld, light
       [gatePos2, -1],
       [far, 1],
     ] as [THREE.Vector3, number][]) {
-      for (let k = 0; k < 3; k++) {
-        const r = 0.7 + k * 0.15;
-        const c = base.clone().addScaledVector(gdir, sgn * (1.0 + k * 1.3));
+      for (let k = 0; k < 6; k++) {
+        const r = 0.7 + (k % 3) * 0.15 + (k > 2 ? 0.25 : 0);
+        const c = base.clone().addScaledVector(gdir, sgn * (1.0 + k * 1.35));
         c.y = H(c.x, c.z);
         const g = new THREE.IcosahedronGeometry(r, 1);
         const pa = g.getAttribute('position');
