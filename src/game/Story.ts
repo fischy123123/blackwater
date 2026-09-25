@@ -800,6 +800,8 @@ export class Story {
   private beatDawn() {
     this.setObjective('Go down to the flats. The cliff path starts past the lighthouse.', false);
     music.cue('dawn');
+    // the last of the storm breaks up while you step outside
+    this.env.setWeather('dawn', 75);
     this.after(2, () =>
       this.say([
         { who: 'thought', text: 'Morning.', pause: 1.0 },
@@ -1388,7 +1390,7 @@ export class Story {
       power: [16.95, 'gathering'],
       key: [17.4, 'storm'],
       lighthouse: [17.9, 'storm'],
-      dawn: [7.15, 'dawn'],
+      dawn: [7.3, 'clearing'],
       wall: [7.75, 'reveal'],
     };
     env.snap(tw[cp][0], tw[cp][1]);

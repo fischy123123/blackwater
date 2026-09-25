@@ -137,7 +137,7 @@ void main() {
   float f1 = bwFbm(q * vec2(0.012, 0.004) + vec2(0.0, t * 0.03));
   float f2 = bwFbm(q * vec2(0.06, 0.02) + vec2(t * 0.02, t * 0.16));
   float f3 = bwFbm(q * vec2(0.3, 0.09) + vec2(0.0, t * 0.6));
-  vec2 pert = vec2((f1 - 0.5) * 0.5 + (f2 - 0.5) * 0.25 + (f3 - 0.5) * 0.1, (f2 - 0.5) * 0.3 + (f1 - 0.5) * 0.2);
+  vec2 pert = vec2((f1 - 0.5) * 0.8 + (f2 - 0.5) * 0.45 + (f3 - 0.5) * 0.18, (f2 - 0.5) * 0.5 + (f1 - 0.5) * 0.3);
   if (uTouch.w > 0.0) {
     float d = distance(vWorld, uTouch.xyz);
     float front = uTouch.w * 9.0;
@@ -165,7 +165,7 @@ void main() {
   float shafts = pow(bwVNoise(rq), 3.0) * 1.6 + pow(bwVNoise(rq * 2.7 + 5.0), 4.0);
   vec3 body = down + through + sunIn * (0.5 + shafts * 2.2);
   body *= mix(vec3(0.55, 1.0, 0.95), vec3(0.8, 1.0, 1.0), h01);
-  body *= mix(0.3, 1.0, pow(h01, 0.6));
+  body *= mix(0.18, 1.0, pow(h01, 0.5));
   // water sliding down the face in slow glassy ribbons
   float ribbon = pow(bwVNoise(vec2(vWorld.x * 0.35 + f1 * 3.0, vWorld.y * 0.015 + t * 0.35)), 5.0);
   body += (down * 0.3 + sunIn * 0.6) * ribbon;
@@ -192,9 +192,12 @@ void main() {
   body *= mix(0.35, 1.0, smoothstep(-0.3, 0.4, wd));
 
   vec3 col = mix(body, refl, F);
-  // sun glints on the moving face
+  // sun glints on the moving face: a broad sheen plus sharp sparkles
   vec3 Hs = normalize(uSunDir - V);
-  col += uSunColorW * pow(max(dot(n, Hs), 0.0), 400.0) * 0.08;
+  float nh = max(dot(n, Hs), 0.0);
+  col += uSunColorW * (pow(nh, 60.0) * 0.012 + pow(nh, 600.0) * 0.15);
+  // sky sheen off the undulating sheets
+  col += refl * smoothstep(0.55, 0.9, f1) * 0.18;
   // crest high above catches the light; churn and spray at the foot
   float top = smoothstep(0.975, 1.0, vUv.y);
   float foot = smoothstep(0.06, 0.0, vUv.y) * (0.5 + 0.5 * bwFbm(vec2(vWorld.x * 0.08, t * 0.8)));

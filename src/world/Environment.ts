@@ -32,7 +32,7 @@ export const WEATHER_PRESETS: Record<string, Weather> = {
   storm: { coverage: 0.98, cloudDensity: 1.8, cloudBase: 700, cloudTop: 4200, storm: 1, rain: 1, wind: 1, haze: 1.6, fog: 3.0, mist: 0.0, mistHeight: 8, bank: 0.02, bankZ: 420, lightning: 6 },
   clearing: { coverage: 0.55, cloudDensity: 1.1, cloudBase: 1200, cloudTop: 3600, storm: 0.25, rain: 0, wind: 0.45, haze: 1.2, fog: 1.6, mist: 0.004, mistHeight: 9, bank: 0.018, bankZ: 600, lightning: 0.2 },
   dawn: { coverage: 0.4, cloudDensity: 1.0, cloudBase: 1400, cloudTop: 3300, storm: 0.05, rain: 0, wind: 0.2, haze: 1.1, fog: 1.3, mist: 0.006, mistHeight: 10, bank: 0.022, bankZ: 700, lightning: 0 },
-  reveal: { coverage: 0.3, cloudDensity: 0.9, cloudBase: 1500, cloudTop: 3300, storm: 0, rain: 0, wind: 0.12, haze: 0.8, fog: 0.9, mist: 0.0008, mistHeight: 6, bank: 0.02, bankZ: 700, lightning: 0 },
+  reveal: { coverage: 0.3, cloudDensity: 0.9, cloudBase: 1500, cloudTop: 3300, storm: 0, rain: 0, wind: 0.12, haze: 0.6, fog: 0.8, mist: 0.0003, mistHeight: 6, bank: 0.02, bankZ: 700, lightning: 0 },
   surge: { coverage: 0.5, cloudDensity: 1.1, cloudBase: 1300, cloudTop: 3400, storm: 0.15, rain: 0, wind: 0.65, haze: 1.0, fog: 1.1, mist: 0.0004, mistHeight: 8, bank: 0.003, bankZ: 900, lightning: 0 },
   aftermath: { coverage: 0.45, cloudDensity: 1.0, cloudBase: 1300, cloudTop: 3400, storm: 0.1, rain: 0, wind: 0.35, haze: 0.9, fog: 1.0, mist: 0.002, mistHeight: 8, bank: 0.0, bankZ: 1400, lightning: 0 },
 };
