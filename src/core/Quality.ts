@@ -171,6 +171,8 @@ export class DynamicResolution {
   private acc = 0;
   private frames = 0;
   private cooldown = 2;
+  private starved = 0;
+  onStarved: ((avgFrame: number) => void) | null = null;
   constructor(public q: QualitySettings, public target = 1 / 55) {
     this.scale = q.renderScale;
     if (q.mobile) this.target = 1 / 45;
@@ -188,6 +190,14 @@ export class DynamicResolution {
     let next = this.scale;
     if (avg > this.target * 1.12) next = Math.max(this.q.minScale, this.scale * 0.9);
     else if (avg < this.target * 0.78) next = Math.min(1, this.scale * 1.06);
+    // already at the floor and still far too slow: ask the game to shed features
+    if (this.scale <= this.q.minScale + 1e-3 && avg > this.target * 1.5) {
+      this.starved++;
+      if (this.starved >= 2) {
+        this.starved = 0;
+        this.onStarved?.(avg);
+      }
+    } else this.starved = 0;
     if (Math.abs(next - this.scale) > 0.01) {
       this.scale = next;
       this.cooldown = 2.5;

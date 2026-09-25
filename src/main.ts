@@ -34,6 +34,37 @@ async function boot() {
   const story = new Story(game);
   ui.setTouchUI(game.input.touchMode);
 
+  // Performance safety net: shed the most expensive features one at a time.
+  const shed = [
+    () => {
+      for (const m of [world.water.flats, world.water.river, world.water.sea]) (m.material as THREE.ShaderMaterial).uniforms.uSSR.value = 0;
+    },
+    () => {
+      for (const m of world.ground.meshes) (m.userData.uniforms as { uGDensity: { value: number } }).uGDensity.value *= 0.5;
+    },
+    () => {
+      world.env.sun.shadow.mapSize.set(1024, 1024);
+      world.env.sun.shadow.map?.dispose();
+      (world.env.sun.shadow as { map: unknown }).map = null;
+      game.player.flashlight.castShadow = false;
+    },
+    () => {
+      const rm = world.weather.rain.geometry as THREE.InstancedBufferGeometry;
+      rm.instanceCount = Math.floor(rm.instanceCount * 0.5);
+      for (const l of world.lights.pool.splice(2)) {
+        l.visible = false;
+        l.intensity = 0;
+      }
+    },
+  ];
+  engine.dynres.onStarved = () => {
+    const f = shed.shift();
+    if (f) {
+      f();
+      console.info('[blackwater] reduced detail to hold frame rate');
+    }
+  };
+
   // settings
   const applySettings = () => {
     game.input.sensitivity = ui.settings.sensitivity;
@@ -188,6 +219,10 @@ async function boot() {
     }
   };
   ui.onResume = () => pause(false);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) audio.ctx?.suspend().catch(() => void 0);
+    else if (!game.paused) audio.ctx?.resume().catch(() => void 0);
+  });
   ui.onRestart = () => {
     pause(false);
     const s = Story.loadSave();
@@ -218,5 +253,15 @@ async function boot() {
 
 boot().catch((e) => {
   console.error(e);
-  document.body.innerHTML = `<pre style="color:#f88;padding:20px;white-space:pre-wrap">${String(e?.stack ?? e)}</pre>`;
+  const gl2 = (() => {
+    try {
+      return !!document.createElement('canvas').getContext('webgl2');
+    } catch {
+      return false;
+    }
+  })();
+  const msg = gl2
+    ? 'Something went wrong while building the world. Reloading the page usually fixes it.'
+    : 'Blackwater needs WebGL 2. Try a recent version of Chrome, Safari, Firefox or Edge, with hardware acceleration turned on.';
+  document.body.innerHTML = `<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;background:#050607;color:#e9e4da;font:16px/1.6 Spectral,Georgia,serif;text-align:center"><div style="max-width:460px"><div style="font:300 28px 'Cormorant Garamond',Georgia,serif;letter-spacing:.4em;margin-bottom:18px">BLACKWATER</div><p>${msg}</p><p style="opacity:.45;font-size:12px;margin-top:18px">${String(e?.message ?? e).replace(/</g, '&lt;')}</p></div></div>`;
 });

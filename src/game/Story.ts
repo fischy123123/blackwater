@@ -736,7 +736,7 @@ export class Story {
       () => this.ui.showHint(this.ui.touchUI ? 'Tap <b>Get out</b> to leave the truck.' : '<b>E</b> — get out', 5),
     );
     this.when(
-      () => this.game.mode === 'walk' && Math.hypot(this.player.pos.x - P.roadblock.x, this.player.pos.z - P.roadblock.z) < 34 && !!this.flags.drove,
+      () => this.game.mode === 'walk' && Math.hypot(this.player.pos.x - P.roadblock.x, this.player.pos.z - P.roadblock.z) < 34,
       () => {
         this.checkpoint('town');
         this.beatTown();
@@ -1018,6 +1018,17 @@ export class Story {
         }
       } else if (b.id === 'main' && !b.on && this.flags.power) {
         this.setPower(false);
+      } else if (b.id === 'f3' && b.on && this.flags.power) {
+        // closing onto the flooded harbor feeder trips the main again
+        this.after(0.3, () => {
+          audio.spark(pos);
+          audio.burst({ type: 'brown', f: 120, q: 0.7, decay: 0.6, gain: 0.9, pos });
+          const main = st.find((x) => x.id === 'main')!;
+          main.on = false;
+          this.setPower(false);
+          refresh();
+          this.say('The harbor line faults the whole board. Leave F3 open.');
+        });
       } else if (this.flags.power) {
         this.applyFeeders();
       }
@@ -1090,6 +1101,8 @@ export class Story {
     const pos = this.anchor('panel');
     audio.burst({ type: 'brown', f: 90, q: 0.6, decay: 1.4, gain: 0.8, pos });
     this.setPower(true);
+    if (this.flags.powerOnce) return; // re-energising after a trip: no second ceremony
+    this.flags.powerOnce = true;
     this.checkpointLater('power', 16);
     music.stopAll();
     this.after(1.5, () => music.cue('power'));
@@ -1380,6 +1393,7 @@ export class Story {
     F.inTown = at('town');
     F.townThought = at('power');
     F.power = at('power');
+    F.powerOnce = at('power');
     F.hasHandheld = at('power');
     F.wrenCall = at('power');
     F.powerCallStarted = at('power');
