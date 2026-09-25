@@ -256,33 +256,23 @@ export class Story {
     const pl = this.w.places;
     const walkOnly = () => g.mode === 'walk';
 
-    // --- truck
+    // --- truck (the door handle doubles as the radio while dispatch is calling)
+    const calling = () => !!this.flags.radioCalling && !this.flags.radioAnswered;
     this.add({
       id: 'truck',
       pos: truck.doorPoint(),
-      radius: 2.7,
-      label: 'Truck',
-      verb: 'Drive',
+      radius: 3.0,
+      label: () => (calling() ? 'Truck radio' : 'Truck'),
+      verb: () => (calling() ? 'Answer' : 'Drive'),
       cone: 0.3,
       requireSight: false,
       enabled: () => walkOnly() && !this.flags.noTruck,
-      onUse: () => g.enterTruck(),
-    });
-    this.add({
-      id: 'truckRadio',
-      pos: truck.doorPoint(),
-      radius: 3,
-      label: 'Radio',
-      verb: 'Answer',
-      cone: 0.2,
-      requireSight: false,
-      enabled: () => walkOnly() && !!this.flags.radioCalling && !this.flags.radioAnswered,
-      onUse: () => this.answerDispatch(),
+      onUse: () => (calling() ? this.answerDispatch() : g.enterTruck()),
     });
     this.add({
       id: 'workorder',
       pos: truck.doorPoint(),
-      radius: 2.6,
+      radius: 3.0,
       label: 'Work order',
       verb: 'Read',
       cone: 0.35,
@@ -293,7 +283,7 @@ export class Story {
     this.add({
       id: 'flashlight',
       pos: V(0, 0, 0),
-      radius: 2.6,
+      radius: 3.0,
       label: 'Flashlight',
       verb: 'Take',
       cone: 0.5,
@@ -307,7 +297,7 @@ export class Story {
     this.add({
       id: 'viewer',
       pos: viewer,
-      radius: 2.2,
+      radius: 2.9,
       label: 'Coin binoculars',
       verb: 'Look',
       onUse: () => {
@@ -331,7 +321,7 @@ export class Story {
     this.add({
       id: 'lhgate',
       pos: gp,
-      radius: 2.6,
+      radius: 3.4,
       label: 'Lighthouse Road gate',
       verb: () => (this.flags.hasKey ? 'Unlock' : 'Try the gate'),
       enabled: () => walkOnly() && !this.flags.gateOpen,
@@ -418,7 +408,7 @@ export class Story {
     this.add({
       id: 'handheld',
       pos: this.anchor('handheld'),
-      radius: 2.0,
+      radius: 2.6,
       label: 'Handheld radio',
       verb: 'Take',
       enabled: () => walkOnly() && !this.flags.hasHandheld,
@@ -432,7 +422,7 @@ export class Story {
     this.add({
       id: 'baseRadio',
       pos: this.anchor('radio'),
-      radius: 2.0,
+      radius: 2.6,
       label: 'Base radio',
       verb: 'Listen',
       enabled: () => walkOnly() && !this.flags.wrenCall,
@@ -479,11 +469,20 @@ export class Story {
           () => {
             this.player.teleport(lh.gallery.x, lh.gallery.y + 0.02, lh.gallery.z, 180, 0);
             this.flags.upTower = true;
+            if (!this.flags.sawLens) {
+              this.flags.sawLens = true;
+              this.after(1.5, () =>
+                this.say([
+                  { who: 'thought', text: 'The lamp’s lit, but the lens isn’t turning.' },
+                  { who: 'thought', text: 'One fixed beam, pointing out over the flats.' },
+                ]),
+              );
+            }
           },
           'metal',
         ),
     });
-    const downPos = lh.lampRoom.clone().add(V(0, 0.9, -1.2));
+    const downPos = lh.lampRoom.clone().add(V(-1.25, 0.25, 0.1));
     this.add({
       id: 'lhDown',
       pos: downPos,
@@ -514,8 +513,8 @@ export class Story {
     });
     this.add({
       id: 'doc-journal3',
-      pos: lh.lampRoom.clone().add(V(-1.1, 0.95, -0.6)),
-      radius: 2.2,
+      pos: lh.lampRoom.clone().add(V(-0.25, 0.95, 1.3)),
+      radius: 2.4,
       label: 'Notebook on the ledge',
       verb: 'Read',
       requireSight: false,
@@ -597,7 +596,7 @@ export class Story {
     this.add({
       id: 'wall',
       pos: V(0, 0, 0),
-      radius: 7,
+      radius: 4.5,
       label: 'The wall of water',
       verb: 'Touch',
       cone: 0.2,
@@ -711,8 +710,9 @@ export class Story {
 
   private beatStormDrive() {
     this.setObjective('Drive back up to the overlook and take Lighthouse Road.', true);
+    const kh = V(P.keeperHouse.x, 0, P.keeperHouse.z);
     this.when(
-      () => !!this.flags.gateOpen && this.game.truck.pos.distanceTo(this.w.places.lighthouse.base) < 140,
+      () => Math.hypot(this.player.pos.x - kh.x, this.player.pos.z - kh.z) < 110 || Math.hypot(this.game.truck.pos.x - kh.x, this.game.truck.pos.z - kh.z) < 110,
       () => this.arriveLighthouse(),
     );
   }
@@ -933,17 +933,17 @@ export class Story {
         const f3 = st.find((x) => x.id === 'f3')!;
         if (f3.on) {
           // fault on the harbor feeder: arc, bang, trip
-          setTimeout(() => {
+          this.after(0.35, () => {
             audio.spark(pos);
             audio.burst({ type: 'brown', f: 120, q: 0.7, decay: 0.6, gain: 0.9, pos });
             this.w.lights.setGroup('bldg:relayhut', true);
-            setTimeout(() => this.w.lights.setGroup('bldg:relayhut', false), 180);
+            this.after(0.18, () => this.w.lights.setGroup('bldg:relayhut', false));
             b.on = false;
             refresh();
             this.flags.tripped = true;
             this.say(this.flags.trippedOnce ? 'Tripped again.' : 'It trips straight back out. Something on the harbor line is shorting.');
             this.flags.trippedOnce = true;
-          }, 350);
+          });
         } else {
           this.restorePower();
         }
@@ -1177,7 +1177,8 @@ export class Story {
     });
     this.after(17, () => {
       this.front.active = true;
-      this.front.z = P.wallZ - 20;
+      this.front.z = P.wallZ - 4;
+      this.front.speed = 2;
       this.seaLevel = this.w.terrain.heightAt(this.player.pos.x, P.wallZ - 20) - 1;
     });
   }
@@ -1507,10 +1508,11 @@ export class Story {
       });
       fire.forEach((f) => f());
     }
-    // follow-the-truck interactables
-    const dp = g.truck.doorPoint();
-    for (const id of ['truck', 'truckRadio', 'workorder']) g.interaction.get(id)?.pos.copy(dp);
-    g.interaction.get('flashlight')?.pos.copy(g.truck.body.localToWorld(V(-1.35, 1.3, 0.55)));
+    // follow-the-truck interactables (door handle, dash radio, seat, toolbox in the bed)
+    const tb = g.truck.body;
+    g.interaction.get('truck')?.pos.copy(tb.localToWorld(V(0.25, 1.15, -1.0)));
+    g.interaction.get('workorder')?.pos.copy(tb.localToWorld(V(0.05, 1.15, 0.95)));
+    g.interaction.get('flashlight')?.pos.copy(tb.localToWorld(V(-1.05, 1.3, 0.2)));
     // radio dial blinks while dispatch is calling
     this.radioBlink += dt;
     if (this.flags.radioCalling && !this.flags.radioAnswered) {
@@ -1585,7 +1587,7 @@ export class Story {
     }
     // wall interactable follows the player along the base
     const wi = g.interaction.get('wall');
-    if (wi) wi.pos.set(this.player.pos.x, this.w.terrain.heightAt(this.player.pos.x, P.wallZ - 3) + 1.4, P.wallZ - 2);
+    if (wi) wi.pos.set(this.player.pos.x, this.player.pos.y + 1.45, P.wallZ - 0.4);
     // the flood
     this.updateFlood(dt);
     // shelter from rain in the truck cab: the particle system handles roofs
@@ -1609,12 +1611,12 @@ export class Story {
     const gap = pz - this.front.z; // negative: the water is behind (south of) the player
     const onTower = this.player.pos.y > this.w.places.tower.base.y + 9;
     let speed = 3.2 + clamp((this.front.z - pz - 22) * 0.12, -1.2, 5);
-    if (onTower || this.front.z < this.w.places.tower.base.z - 30) speed = 7;
+    if (onTower || this.front.z < this.w.places.tower.base.z - 30) speed = 12;
     this.front.speed = damp(this.front.speed, speed, 1.5, dt);
     this.front.z -= this.front.speed * dt;
     sm.uniforms.uFrontZ.value = this.front.z;
     sm.uniforms.uBoreH.value = this.front.z > 260 ? 4.5 : Math.max(0, (this.front.z - 150) / 110) * 4.5;
-    this.seaLevel = Math.min(0.2, this.seaLevel + dt * 0.12);
+    this.seaLevel = Math.min(0.2, this.seaLevel + dt * 0.25);
     sm.uniforms.uSeaLevel.value = this.seaLevel;
     if (this.front.z < 700) this.w.water.flats.visible = false;
     // caught?
@@ -1622,7 +1624,7 @@ export class Story {
     // the tower shakes as the bore passes
     const dTower = Math.abs(this.front.z - this.w.places.tower.base.z);
     if (onTower && dTower < 25) this.player.shake = Math.max(this.player.shake, 1 - dTower / 25);
-    if (this.front.z < 150 && this.endT < 0 && onTower) this.ending();
+    if (this.front.z < 450 && this.endT < 0 && onTower) this.ending();
     if (this.front.z < -300) this.front.active = false;
     void gap;
   }

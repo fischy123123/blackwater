@@ -67,6 +67,11 @@ export class CollisionWorld {
     return this.add({ kind: 'box', x, z, hw: w / 2, hd: d / 2, rot, y0, y1, walkable, tag }) as Box;
   }
 
+  /** Box given in an object's frame: `w` along its local X, `d` along local Z, `yaw` = three.js rotation.y. */
+  boxYaw(x: number, z: number, w: number, d: number, yaw: number, y0: number, y1: number, walkable = false, tag?: string) {
+    return this.box(x, z, w, d, -yaw, y0, y1, walkable, tag);
+  }
+
   circle(x: number, z: number, r: number, y0: number, y1: number, tag?: string) {
     return this.add({ kind: 'circle', x, z, r, y0, y1, tag }) as Circle;
   }
@@ -193,14 +198,24 @@ export class CollisionWorld {
   }
 
   /** Ray march against boxes/circles in XZ + terrain for line-of-sight checks. */
-  segmentBlocked(a: THREE.Vector3, b: THREE.Vector3): boolean {
+  segmentBlocked(a: THREE.Vector3, b: THREE.Vector3, ignoreAt?: THREE.Vector3): boolean {
     const steps = Math.ceil(a.distanceTo(b) / 0.5);
     const p = new THREE.Vector3();
+    // colliders that contain the target itself (its table, its post, its gate) never block it
+    const owns = (c: Collider) => {
+      if (!ignoreAt) return false;
+      if (ignoreAt.y < c.y0 - 0.6 || ignoreAt.y > c.y1 + 0.6) return false;
+      if (c.kind === 'circle') return Math.hypot(ignoreAt.x - c.x, ignoreAt.z - c.z) < c.r + 0.35;
+      const lx = (ignoreAt.x - c.x) * c.c! + (ignoreAt.z - c.z) * c.s!;
+      const lz = -(ignoreAt.x - c.x) * c.s! + (ignoreAt.z - c.z) * c.c!;
+      return Math.abs(lx) < c.hw + 0.35 && Math.abs(lz) < c.hd + 0.35;
+    };
     for (let i = 1; i < steps; i++) {
       p.lerpVectors(a, b, i / steps);
       if (p.y < this.heightAt(p.x, p.z)) return true;
       for (const c of this.query(p.x, p.z, 0.2)) {
         if (p.y < c.y0 || p.y > c.y1) continue;
+        if (owns(c)) continue;
         if (c.kind === 'circle') {
           if (Math.hypot(p.x - c.x, p.z - c.z) < c.r) return true;
         } else if (c.enabled !== false) {

@@ -105,7 +105,7 @@ export class Game {
       const mat = tint !== undefined ? doorMat.clone() : doorMat;
       if (tint !== undefined) (mat as THREE.MeshStandardMaterial).color.setHex(tint);
       for (const d of b.doors) {
-        if (!(b.spec.facades?.[d.side]?.doors ?? []).some((ds) => ds.id === d.id && ds.enterable) && !d.id.endsWith('-door')) continue;
+        if (!(b.spec.facades?.[d.side]?.doors ?? []).some((ds) => ds.id === d.id && ds.enterable)) continue;
         const tangent = new THREE.Vector3(Math.cos(d.yaw), 0, -Math.sin(d.yaw));
         const hinge = d.world.clone().addScaledVector(tangent, -d.w / 2);
         const door = new Door(engine.scene, world.collision, this.interaction, { id: d.id, hinge, yaw: d.yaw, w: d.w, h: d.h, mat, label: 'Door' });
@@ -323,8 +323,11 @@ export class Game {
       this.player.update(dt, env.preExposure);
       if (this.input.consume('interact') || this.input.consume('back') || this.input.consume('jump')) this.endBinoculars();
     }
-    // truck physics runs even when parked (settling, audio)
-    if (this.mode !== 'drive') this.truck.update(dt, null, this.world.collision, env.preExposure);
+    // truck physics runs even when parked (settling, audio); never collide with its own box
+    if (this.mode !== 'drive') {
+      if (this.truckBox) this.truckBox.enabled = false;
+      this.truck.update(dt, null, this.world.collision, env.preExposure);
+    }
     this.syncTruckCollider();
     const dark = Math.asin(env.sunDir.y) / DEG < 1.5 || env.weather.storm > 0.55;
     if (this.truck.occupied && dark !== this.truckWasDark) this.truck.setLights(dark, env.preExposure);
@@ -369,6 +372,7 @@ export class Game {
       t.lookYaw = damp(t.lookYaw, 0, 1.5, dt);
       t.lookPitch = damp(t.lookPitch, -0.05, 1.5, dt);
     }
+    if (this.truckBox) this.truckBox.enabled = false;
     t.update(dt, inp, this.world.collision, env.preExposure);
     const cam = this.engine.camera;
     const q = new THREE.Quaternion();

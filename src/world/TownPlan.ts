@@ -108,7 +108,7 @@ function house(id: string, x: number, z: number, fx: number, fz: number, color: 
   const facades: Partial<Record<'front' | 'back' | 'left' | 'right', FacadeSpec>> = {
     front: {
       windows: storeys(w, 2, stories, 2.9, 0.85, 1.45, (i, s) => s === 0 && i === 0).concat(stories > 0 ? [{ x: -w / 2 + 1.5, w: 0.85, h: 1.45, sill: 0.85 }] : []),
-      doors: [{ x: 1.2, w: 0.95, h: 2.1, id: id + '-door' }],
+      doors: [{ x: 1.2, w: 0.95, h: 2.1, id: id + '-door', enterable: opts.enterable }],
     },
     back: { windows: storeys(w, 2, stories, 2.9, 0.8, 1.3), doors: [{ x: -1.5, w: 0.9, h: 2.05, id: id + '-back' }] },
     left: { windows: storeys(d, 2, stories, 2.9, 0.8, 1.4) },

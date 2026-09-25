@@ -38,7 +38,7 @@ class Furnisher {
   /** collision box in local coords */
   solid(x: number, z: number, w: number, d: number, h: number, walkable = false, tag = 'furniture', yLocal = 0) {
     const c = this.world(x, 0, z);
-    this.col.box(c.x, c.z, w, d, this.info.spec.yaw, this.y0 + yLocal - 0.1, this.y0 + yLocal + h, walkable, tag);
+    this.col.boxYaw(c.x, c.z, w, d, this.info.spec.yaw, this.y0 + yLocal - 0.1, this.y0 + yLocal + h, walkable, tag);
   }
   anchor(name: string, x: number, y: number, z: number, yaw = 0) {
     this.anchors.set(name, { pos: this.world(x, y, z), yaw: this.info.spec.yaw + yaw });
@@ -298,7 +298,7 @@ export function furnishAll(buildings: Map<string, BuildingInfo>, collision: Coll
     f.ceilingLight(0, d * 0.35, 'sheriff-light-1', 'fluorescent', 0.07);
     f.ceilingLight(0, d * 0.75, 'sheriff-light-2', 'fluorescent', 0.07);
     // front counter
-    f.counter(0, 2.2, w - 3.5, 0.6, 0, 0x7a6a5a, 0x5a4a3a);
+    f.counter(0.6, 2.2, w - 4.7, 0.6, 0, 0x7a6a5a, 0x5a4a3a);
     // desk with typewriter, radio, the log
     f.table(-2.4, 5.4, 1.5, 0.8, 0.76, 0x4a3a2a);
     f.box('metal', -2.7, 0.76, 5.4, 0.45, 0.14, 0.35, 0x3a3e3a, false); // typewriter
@@ -471,8 +471,9 @@ export function furnishAll(buildings: Map<string, BuildingInfo>, collision: Coll
     f.box('metal', -2.9, 0.78, 1.0, 0.5, 0.3, 0.35, 0x3a3834, false);
     f.box('metal', -2.3, 0.78, 1.0, 0.45, 0.12, 0.35, 0x2a2826, false);
     f.anchor('recorder', -2.4, 1.0, 1.0);
-    f.paper(-2.6, 0.79, 1.3, 0.14, 0.09, 0.4, -Math.PI / 2, 0xf2ead0);
-    f.anchor('journal2', -2.6, 0.85, 1.25);
+    f.paper(-2.6, 0.79, 1.3, 0.14, 0.09, 0.4, -Math.PI / 2, 0xf2ead0); // reel label
+    f.paper(-2.2, 0.62, d - 1.9, 0.22, 0.3, 0.5, -Math.PI / 2, 0xe8dcc0); // journal left on the bed
+    f.anchor('journal2', -2.2, 0.66, d - 1.9);
     f.shelf(w / 2 - 0.35, 3.2, 1.6, 1.8, -Math.PI / 2);
     f.bed(-2.6, d - 1.4, 0);
     f.tableLamp(-1.2, 0.6, d - 0.6, 'keeper-lamp');

@@ -374,7 +374,7 @@ export class BuildingGen {
       for (let i = 0; i < n; i++) {
         const x = px - pw / 2 + 0.12 + ((pw - 0.24) * i) / (n - 1);
         b.box('trim', x, ph / 2, -p.depth + 0.12, 0.14, ph, 0.14);
-        this.col.box(...this.worldXZ(matrix, x, -p.depth + 0.12), 0.18, 0.18, spec.yaw, spec.floorY, spec.floorY + ph, false);
+        this.col.boxYaw(...this.worldXZ(matrix, x, -p.depth + 0.12), 0.18, 0.18, spec.yaw, spec.floorY, spec.floorY + ph, false);
       }
       // railing (skip centre for steps)
       for (let i = 0; i < n - 1; i++) {
@@ -397,7 +397,7 @@ export class BuildingGen {
       b.quad('trim', [V(px - pw / 2, ph - 0.02, -p.depth - e + 0.05), V(px + pw / 2, ph - 0.02, -p.depth - e + 0.05), V(px + pw / 2, ph + 0.45, 0), V(px - pw / 2, ph + 0.45, 0)]);
       // collision: deck
       const dc = this.worldXZ(matrix, px, -p.depth / 2);
-      this.col.box(dc[0], dc[1], pw, p.depth, spec.yaw, spec.floorY - 3, spec.floorY, true, 'wood');
+      this.col.boxYaw(dc[0], dc[1], pw, p.depth, spec.yaw, spec.floorY - 3, spec.floorY, true, 'wood');
       // steps down to the ground
       if (p.steps !== false) {
         const g = ground(...this.worldXZ(matrix, px, -p.depth - 0.8));
@@ -410,7 +410,7 @@ export class BuildingGen {
           b.color.setRGB(0.7, 0.68, 0.62);
           b.box('planks', px, y + rise / 2 - 0.02, z, 1.6, rise, 0.32, 0.5);
           const sc = this.worldXZ(matrix, px, z);
-          this.col.box(sc[0], sc[1], 1.6, 0.32, spec.yaw, spec.floorY - 3, spec.floorY + y + rise, true, 'wood');
+          this.col.boxYaw(sc[0], sc[1], 1.6, 0.32, spec.yaw, spec.floorY - 3, spec.floorY + y + rise, true, 'wood');
         }
       }
     }
@@ -428,7 +428,7 @@ export class BuildingGen {
     // ------------------------------------------------ collision
     if (!spec.enterable) {
       const c = this.worldXZ(matrix, 0, d / 2);
-      this.col.box(c[0], c[1], w, d, spec.yaw, spec.floorY - 3, spec.floorY + H + 3, false, 'building');
+      this.col.boxYaw(c[0], c[1], w, d, spec.yaw, spec.floorY - 3, spec.floorY + H + 3, false, 'building');
     } else {
       // exterior walls as thin boxes with door gaps
       const t = 0.2;
@@ -449,19 +449,19 @@ export class BuildingGen {
           const wc = this.worldXZ(matrix, mid.x, mid.z);
           const along = c - a;
           const isFB = side === 'front' || side === 'back';
-          this.col.box(wc[0], wc[1], isFB ? along : t, isFB ? t : along, spec.yaw, spec.floorY - 3, spec.floorY + H + 2, false, 'wall');
+          this.col.boxYaw(wc[0], wc[1], isFB ? along : t, isFB ? t : along, spec.yaw, spec.floorY - 3, spec.floorY + H + 2, false, 'wall');
         }
         // lintel above doors
         for (const dd of doors) {
           const mid = facadePoint(side, w, d, L / 2 + dd.x, 0, -t / 2);
           const wc = this.worldXZ(matrix, mid.x, mid.z);
           const isFB = side === 'front' || side === 'back';
-          this.col.box(wc[0], wc[1], isFB ? dd.w : t, isFB ? t : dd.w, spec.yaw, spec.floorY + dd.h, spec.floorY + H + 2, false, 'wall');
+          this.col.boxYaw(wc[0], wc[1], isFB ? dd.w : t, isFB ? t : dd.w, spec.yaw, spec.floorY + dd.h, spec.floorY + H + 2, false, 'wall');
         }
       }
       // floor
       const fc = this.worldXZ(matrix, 0, d / 2);
-      info.interiorBoxes.push(this.col.box(fc[0], fc[1], w - 0.1, d - 0.1, spec.yaw, spec.floorY - 3, spec.floorY, true, 'wood'));
+      info.interiorBoxes.push(this.col.boxYaw(fc[0], fc[1], w - 0.1, d - 0.1, spec.yaw, spec.floorY - 3, spec.floorY, true, 'wood'));
     }
 
     b.pop();

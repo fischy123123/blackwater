@@ -265,7 +265,15 @@ export class Input {
       this.look.set(0, 0);
     }
     this.move.set(mx, my);
+    if (this.forceMove) {
+      this.move.copy(this.forceMove);
+      this.sprint = this.forceSprint;
+    }
   }
+
+  /** Scripted movement (automated tests / cutscenes). */
+  forceMove: THREE.Vector2 | null = null;
+  forceSprint = false;
 
   private padPrev: boolean[] = [];
   private padEdge(i: number, down: boolean, a: Action) {

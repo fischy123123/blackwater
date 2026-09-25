@@ -58,7 +58,7 @@ export class Interaction {
     if (i.requireSight !== false && d > 1.2) {
       const from = this.eye.clone().addScaledVector(this.dir, 0.25);
       const to = i.pos.clone().addScaledVector(this.tmp.normalize(), -0.35);
-      if (this.collision.segmentBlocked(from, to)) return -1;
+      if (this.collision.segmentBlocked(from, to, i.pos)) return -1;
     }
     return c * 2 - d * 0.05;
   }
@@ -206,7 +206,7 @@ export class Door {
     const cz = this.pivot.position.z - Math.sin(yaw) * this.width * 0.5;
     this.box.x = cx;
     this.box.z = cz;
-    this.box.rot = yaw;
+    this.box.rot = -yaw; // collider rotation is the negated three.js yaw
     this.col.updateBox(this.box);
   }
 

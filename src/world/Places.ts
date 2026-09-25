@@ -31,6 +31,7 @@ export type PlacesResult = {
   figures: THREE.Group;
   tower: { base: THREE.Vector3; top: THREE.Vector3; ladder: THREE.Vector3 };
   wall: THREE.Mesh;
+  wallBox: import('./Collision').Box;
   lhGate: { pos: THREE.Vector3; yaw: number; bar: THREE.Group };
   footprints: THREE.Mesh;
 };
@@ -229,14 +230,37 @@ export function buildPlaces(scene: THREE.Scene, collision: CollisionWorld, light
       b.cylinder('metal', V(p.x, H(p.x, p.z) - 0.2, p.z), V(p.x, H(p.x, p.z) + 2.4, p.z), 0.04, 0.04, 6);
     }
     b.beam('metal', a.clone().setY(H(a.x, a.z) + 2.35), c.clone().setY(H(c.x, c.z) + 2.35), 0.05, 0.05);
-    // mesh panels
+    // mesh panels (the west side is split around the gateway)
     const mid = a.clone().add(c).multiplyScalar(0.5);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(len, 2.3), CHAINLINK());
-    m.position.set(mid.x, H(mid.x, mid.z) + 1.15, mid.z);
-    m.rotation.y = Math.atan2(c.z - a.z, c.x - a.x) * -1;
-    m.castShadow = true;
-    group.add(m);
-    collision.box(mid.x, mid.z, len, 0.15, -Math.atan2(c.z - a.z, c.x - a.x), mid.y - 1, mid.y + 3, false, 'fence');
+    const spans: [THREE.Vector3, THREE.Vector3][] = [];
+    if (i === 3) {
+      const u = c.clone().sub(a).normalize();
+      spans.push([a, gatePos.clone().addScaledVector(u, -1.9)], [gatePos.clone().addScaledVector(u, 1.9), c]);
+    } else spans.push([a, c]);
+    for (const [p0, p1] of spans) {
+      const pm = p0.clone().add(p1).multiplyScalar(0.5);
+      const pl = p0.distanceTo(p1);
+      const tex = CHAINLINK();
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(pl, 2.3), tex);
+      m.position.set(pm.x, H(pm.x, pm.z) + 1.15, pm.z);
+      m.rotation.y = Math.atan2(p1.z - p0.z, p1.x - p0.x) * -1;
+      m.castShadow = true;
+      group.add(m);
+    }
+    const ang = Math.atan2(c.z - a.z, c.x - a.x);
+    if (i === 3) {
+      // west side: leave the gateway open
+      const u = c.clone().sub(a).normalize();
+      const g0 = gatePos.clone().addScaledVector(u, -1.9),
+        g1 = gatePos.clone().addScaledVector(u, 1.9);
+      for (const [p0, p1] of [
+        [a, g0],
+        [g1, c],
+      ] as [THREE.Vector3, THREE.Vector3][]) {
+        const m2 = p0.clone().add(p1).multiplyScalar(0.5);
+        collision.box(m2.x, m2.z, p0.distanceTo(p1), 0.15, ang, mid.y - 1, mid.y + 3, false, 'fence');
+      }
+    } else collision.box(mid.x, mid.z, len, 0.15, ang, mid.y - 1, mid.y + 3, false, 'fence');
   }
   // gate gap: remove fence collision in the gap by adding nothing (fence boxes span the side; open the gap)
   // (we re-add the west side as two segments)
@@ -250,7 +274,7 @@ export function buildPlaces(scene: THREE.Scene, collision: CollisionWorld, light
       b.color.setRGB(0.45, 0.35, 0.28);
       b.cylinder('insulator', V(t.x + k * 0.7, t.y + 2.6, t.z), V(t.x + k * 0.7, t.y + 3.6, t.z), 0.1, 0.06, 8);
     }
-    collision.box(t.x, t.z, 2.6, 2.4, -yardYaw, t.y - 1, t.y + 3, false, 'transformer');
+    collision.box(t.x, t.z, 2.6, 2.0, 0, t.y - 1, t.y + 3, false, 'transformer');
   }
   // bus structure
   for (const lx of [-8, 0, 8]) {
@@ -356,7 +380,7 @@ export function buildPlaces(scene: THREE.Scene, collision: CollisionWorld, light
     // gallery rail as a ring of boxes
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2;
-      collision.box(lb.x + Math.cos(a) * 3.3, lb.z + Math.sin(a) * 3.3, 1.4, 0.2, -a + Math.PI / 2, lb.y + TH + 0.3, lb.y + TH + 1.6, false, 'rail');
+      collision.box(lb.x + Math.cos(a) * 3.3, lb.z + Math.sin(a) * 3.3, 1.4, 0.2, a + Math.PI / 2, lb.y + TH + 0.3, lb.y + TH + 1.6, false, 'rail');
     }
     // the lens pedestal inside the lamp room
     collision.circle(lb.x, lb.z, 0.75, lb.y + TH + 0.3, lb.y + TH + 3.2, 'lens');
@@ -447,6 +471,30 @@ export function buildPlaces(scene: THREE.Scene, collision: CollisionWorld, light
     const far = gatePos2.clone().add(V(Math.cos(gateYaw) * 5.3, 0, -Math.sin(gateYaw) * 5.3));
     far.y = H(far.x, far.z);
     b.cylinder('metal', far.clone().add(V(0, -0.3, 0)), far.clone().add(V(0, 1.1, 0)), 0.08, 0.08, 8);
+    // boulders either side so the gate can't simply be driven around
+    const gdir = V(Math.cos(gateYaw), 0, -Math.sin(gateYaw));
+    for (const [base, sgn] of [
+      [gatePos2, -1],
+      [far, 1],
+    ] as [THREE.Vector3, number][]) {
+      for (let k = 0; k < 3; k++) {
+        const r = 0.7 + k * 0.15;
+        const c = base.clone().addScaledVector(gdir, sgn * (1.0 + k * 1.3));
+        c.y = H(c.x, c.z);
+        const g = new THREE.IcosahedronGeometry(r, 1);
+        const pa = g.getAttribute('position');
+        for (let q = 0; q < pa.count; q++) {
+          const vx = pa.getX(q),
+            vz = pa.getZ(q);
+          const f = 1 + Math.sin(vx * 4.1 + k) * Math.sin(vz * 3.3 + k * 2.1) * 0.22;
+          pa.setXYZ(q, vx * f * 1.2, pa.getY(q) * f * 0.8, vz * f);
+        }
+        g.computeVertexNormals();
+        b.color.setRGB(0.42, 0.41, 0.38);
+        b.geometry('rock', g, new THREE.Matrix4().compose(V(c.x, c.y + r * 0.25, c.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, k * 1.7, 0.1)), V(1, 1, 1)));
+        collision.circle(c.x, c.z, r * 1.1, c.y - 1, c.y + r, 'rock');
+      }
+    }
   }
 
   // cliff-path handrail posts
@@ -666,7 +714,7 @@ export function buildPlaces(scene: THREE.Scene, collision: CollisionWorld, light
       [-1.2, 1.2],
     ];
     b.color.setRGB(0.3, 0.32, 0.3);
-    b.box('concrete', tb.x, tb.y + 0.3, tb.z, 3.6, 1.2, 3.6, 0.5);
+    b.box('concrete', tb.x, tb.y - 0.35, tb.z, 3.6, 0.9, 3.6, 0.5);
     for (const [lx, lz] of legs2) b.beam('metal', V(tb.x + lx * 1.2, tb.y, tb.z + lz * 1.2), V(tb.x + lx * 0.7, tb.y + TT, tb.z + lz * 0.7), 0.14, 0.14);
     for (let h = 1; h < TT; h += 2.2) {
       const k0 = 1.2 - (h / TT) * 0.5,
@@ -693,7 +741,7 @@ export function buildPlaces(scene: THREE.Scene, collision: CollisionWorld, light
     const lz = tb.z - 1.25;
     for (const lx of [-0.25, 0.25]) b.beam('metal', V(tb.x + lx, tb.y, lz), V(tb.x + lx, tb.y + TT + 1, lz + 0.4), 0.04, 0.04);
     for (let h = 0.3; h < TT; h += 0.3) b.beam('metal', V(tb.x - 0.25, tb.y + h, lz + (h / TT) * 0.4), V(tb.x + 0.25, tb.y + h, lz + (h / TT) * 0.4), 0.025, 0.025);
-    collision.box(tb.x, tb.z, 3.6, 3.6, 0, tb.y - 1, tb.y + 0.9, true, 'concrete');
+    collision.box(tb.x, tb.z, 3.6, 3.6, 0, tb.y - 1, tb.y + 0.1, true, 'concrete');
     collision.box(tb.x, tb.z, 2.6, 2.6, 0, tb.y + TT - 1, tb.y + TT + 0.06, true, 'metal');
   }
 
@@ -757,6 +805,7 @@ export function buildPlaces(scene: THREE.Scene, collision: CollisionWorld, light
   });
   const wall = new THREE.Mesh(wallGeo, wallMat);
   wall.position.set(-190, 0, P.wallZ);
+  const wallBox = collision.box(-190, P.wallZ + 1.2, 5200, 2.0, 0, -200, 400, false, 'wall');
   wall.rotation.y = Math.PI; // face the shore
   wall.layers.set(LAYER.TRANSPARENT);
   wall.visible = false;
@@ -797,6 +846,7 @@ export function buildPlaces(scene: THREE.Scene, collision: CollisionWorld, light
     figures,
     tower: { base: tb, top: V(tb.x, tb.y + TT + 0.07, tb.z), ladder: V(tb.x, tb.y, tb.z - 1.6) },
     wall,
+    wallBox,
     lhGate: { pos: gatePos2, yaw: gateYaw, bar: gateBar },
     footprints: fp,
   };

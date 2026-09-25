@@ -148,7 +148,7 @@ export function dressWorld(
   const carAt = (x: number, z: number, yaw: number, model: CarModel, color: number, opts: { doorOpen?: boolean; dirt?: number } = {}) => {
     const y = H(x, z) + (terrain.surfaceAt(x, z).road > 0.5 ? 0.3 : 0);
     const f = bakeCar(b, model, x, y, z, yaw, color, opts);
-    collision.box(x, z, f.length, f.width, yaw + Math.PI / 2, y - 1, y + 1.5, false, 'car');
+    collision.boxYaw(x, z, f.length, f.width, yaw, y - 1, y + 1.5, false, 'car');
     return V(x, y, z);
   };
   // Main Street curbside
@@ -226,7 +226,7 @@ export function dressWorld(
     const mid = a.clone().add(c).multiplyScalar(0.5);
     const len = a.distanceTo(c);
     const yaw = Math.atan2(c.x - a.x, c.z - a.z);
-    collision.box(mid.x, mid.z, w, len, yaw, y - 6, y, true, 'wood');
+    collision.boxYaw(mid.x, mid.z, w, len, yaw, y - 6, y, true, 'wood');
   };
   pierBox(V(8, 0, 197), V(8, 0, 272.5), 3.4, 3.4);
   pierBox(V(8, 0, 277), V(8, 0, 302), 3.4, 3.4);
@@ -249,7 +249,7 @@ export function dressWorld(
   for (const [x, z, yaw, roll, pitch, hull, cab] of boats) {
     const y = H(x, z) - 0.25;
     bakeBoat(b, x, y, z, yaw, roll, pitch, hull, cab, rng.range(9.5, 12.5));
-    collision.box(x, z, 3.4, 11, yaw, y - 1, y + 3.5, false, 'boat');
+    collision.boxYaw(x, z, 11, 3.4, yaw, y - 1, y + 3.5, false, 'boat');
   }
   // gear on the waterfront
   for (let i = 0; i < 14; i++) {
@@ -323,7 +323,7 @@ export function dressWorld(
       const a = rail[i],
         c = rail[i + 1];
       const mid = a.clone().add(c).multiplyScalar(0.5);
-      collision.box(mid.x, mid.z, a.distanceTo(c), 0.3, Math.atan2(c.z - a.z, c.x - a.x) * -1, mid.y - 1, mid.y + 0.9, false, 'rail');
+      collision.box(mid.x, mid.z, a.distanceTo(c), 0.3, Math.atan2(c.z - a.z, c.x - a.x), mid.y - 1, mid.y + 0.9, false, 'rail');
     }
     // tower viewer (coin binoculars)
     b.color.setRGB(0.2, 0.34, 0.3);
@@ -389,10 +389,10 @@ export function dressWorld(
       b.color.setRGB(0.58, 0.57, 0.54);
       b.box('concrete', p.x, (g + p.y - 1.0) / 2, p.z, 2.2, p.y - 1.0 - g, 5.5, 0.5);
     }
-    collision.box(mid.x, mid.z, 9.2, len, yaw, mid.y - 3, mid.y, true, 'concrete');
+    collision.boxYaw(mid.x, mid.z, 9.2, len, yaw, mid.y - 3, mid.y, true, 'concrete');
     for (const sx of [-4.4, 4.4]) {
       const off = V(Math.cos(yaw) * sx, 0, -Math.sin(yaw) * sx);
-      collision.box(mid.x + off.x, mid.z + off.z, 0.3, len, yaw, mid.y - 1, mid.y + 1.2, false, 'rail');
+      collision.boxYaw(mid.x + off.x, mid.z + off.z, 0.3, len, yaw, mid.y - 1, mid.y + 1.2, false, 'rail');
     }
   }
 
@@ -418,7 +418,7 @@ export function dressWorld(
     group.add(tree);
     const Ht = fallenTree.height;
     const cmid = tree.position.clone().addScaledVector(T, Ht / 2);
-    collision.box(cmid.x, cmid.z, Ht, 1.7, a, ty - 2, ty + 1.9, false, 'tree');
+    collision.boxYaw(cmid.x, cmid.z, Ht, 1.7, a, ty - 2, ty + 1.9, false, 'tree');
     // root plate torn out of the bank
     b.color.setRGB(0.3, 0.24, 0.18);
     b.pushTRS(tree.position.x - T.x * 0.3, ty + 0.9, tree.position.z - T.z * 0.3, a);
