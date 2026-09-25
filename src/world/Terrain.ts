@@ -14,7 +14,7 @@ const LEAF = 32;
 
 export const TERRAIN_LAYERS = ['grass', 'forest', 'rock', 'mud', 'sand', 'gravel', 'algae', 'cobble'];
 
-const TERRAIN_HEIGHT_GLSL = /* glsl */ `
+export const TERRAIN_HEIGHT_GLSL = /* glsl */ `
 uniform highp sampler2D uHeightTex;
 uniform vec4 uTerrainInfo; // minX, minZ, size, res
 float bwHFetch(ivec2 c) {

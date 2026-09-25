@@ -34,6 +34,16 @@ export class UI {
   notebookBtn: HTMLElement;
   notebook: HTMLElement;
   fadeEl: HTMLElement;
+  panel: HTMLElement;
+  binoc: HTMLElement;
+  credits: HTMLElement;
+  savedEl: HTMLElement;
+  panelOpen = false;
+  private panelItems: { id: string; label: string; on: boolean; tag?: string }[] = [];
+  private panelFocus = 0;
+  private onPanelToggle: ((id: string) => void) | null = null;
+  private onPanelClose: (() => void) | null = null;
+  private padPrev: boolean[] = [];
   settings: Settings;
   onBegin: ((cont: boolean) => void) | null = null;
   onSettings: ((s: Settings) => void) | null = null;
@@ -99,6 +109,13 @@ export class UI {
       e.stopPropagation();
       this.closeDoc();
     });
+    addEventListener('keydown', (e) => {
+      if (!this.docOpen) return;
+      if (['KeyE', 'Escape', 'Enter', 'Space', 'Backspace'].includes(e.code)) {
+        e.preventDefault();
+        this.closeDoc();
+      }
+    });
 
     // Notebook (current thought / collected notes)
     this.notebook = el('div', 'notebook hidden');
@@ -137,6 +154,39 @@ export class UI {
     this.notebookBtn.setAttribute('aria-label', 'Notebook');
     this.touch.append(this.stickBase, this.actBtn, this.flashBtn, this.menuBtn, this.notebookBtn);
     this.root.appendChild(this.touch);
+
+    // Breaker panel close-up
+    this.panel = el('div', 'panel hidden');
+    this.panel.innerHTML = `<div class="panel-box"><div class="panel-plate">HARROW CO. COMMUNICATIONS · BLACKWATER RELAY<br><span>240 V DISTRIBUTION — FEEDERS</span></div><div class="panel-row"></div><div class="panel-meter"><span class="lamp"></span><span class="panel-status">NO SUPPLY</span></div></div><button class="doc-close" aria-label="Close">✕</button><div class="doc-hint"></div>`;
+    this.root.appendChild(this.panel);
+    this.panel.querySelector('.doc-close')!.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.closePanel();
+    });
+    this.panel.addEventListener('click', (e) => {
+      if (!(e.target as HTMLElement).closest('.panel-box')) this.closePanel();
+    });
+    addEventListener('keydown', (e) => {
+      if (!this.panelOpen) return;
+      const n = Number(e.key);
+      if (n >= 1 && n <= this.panelItems.length) this.onPanelToggle?.(this.panelItems[n - 1].id);
+      else if (e.code === 'ArrowLeft') this.movePanelFocus(-1);
+      else if (e.code === 'ArrowRight') this.movePanelFocus(1);
+      else if (e.code === 'Space' || e.code === 'Enter') this.onPanelToggle?.(this.panelItems[this.panelFocus].id);
+      else if (e.code === 'Escape' || e.code === 'KeyE' || e.code === 'Backspace') this.closePanel();
+    });
+
+    // Binocular mask
+    this.binoc = el('div', 'binoc hidden');
+    this.binoc.innerHTML = `<div class="binoc-hint"></div>`;
+    this.root.appendChild(this.binoc);
+
+    // Credits
+    this.credits = el('div', 'credits hidden');
+    this.root.appendChild(this.credits);
+
+    this.savedEl = el('div', 'saved', 'Progress saved');
+    this.root.appendChild(this.savedEl);
 
     this.fadeEl = el('div', 'fade');
     this.root.appendChild(this.fadeEl);
@@ -241,8 +291,8 @@ export class UI {
     this.reticle.style.opacity = v ? '' : '0';
   }
 
-  subtitle(speaker: string | null, text: string, seconds: number) {
-    if (!this.settings.subtitles && speaker) return;
+  subtitle(speaker: string | null, text: string, seconds: number, force = false) {
+    if (!force && !this.settings.subtitles && speaker) return;
     this.subs.innerHTML = speaker ? `<span class="who">${speaker}</span><span class="line">${text}</span>` : `<span class="line thought">${text}</span>`;
     this.subs.classList.add('on');
     this.subTimer = seconds;
@@ -271,6 +321,7 @@ export class UI {
   }
 
   update(dt: number) {
+    this.pollPad();
     if (this.subTimer > 0) {
       this.subTimer -= dt;
       if (this.subTimer <= 0) this.subs.classList.remove('on');
@@ -282,6 +333,97 @@ export class UI {
     if (this.cardTimer > 0) {
       this.cardTimer -= dt;
       if (this.cardTimer <= 0) this.card.classList.remove('on');
+    }
+  }
+
+  // ---------------------------------------------------------------- breaker panel
+  showPanel(items: { id: string; label: string; on: boolean; tag?: string }[], powered: boolean, onToggle: (id: string) => void, onClose: () => void) {
+    this.onPanelToggle = onToggle;
+    this.onPanelClose = onClose;
+    this.panelOpen = true;
+    this.panelFocus = 0;
+    this.refreshPanel(items, powered);
+    this.panel.classList.remove('hidden');
+    requestAnimationFrame(() => this.panel.classList.add('in'));
+    (this.panel.querySelector('.doc-hint') as HTMLElement).textContent = this.touchUI ? 'Tap a breaker to flip it · tap outside to step back' : 'Click a breaker (or 1–4) to flip it · E / Esc to step back';
+  }
+
+  refreshPanel(items: { id: string; label: string; on: boolean; tag?: string }[], powered: boolean) {
+    this.panelItems = items;
+    const row = this.panel.querySelector('.panel-row') as HTMLElement;
+    row.innerHTML = '';
+    items.forEach((it, i) => {
+      const b = el('button', `brk ${it.on ? 'on' : 'off'}${i === this.panelFocus ? ' focus' : ''}${it.id === 'main' ? ' main' : ''}`);
+      b.innerHTML = `<span class="brk-num">${i + 1}</span><span class="brk-label">${it.label}</span><span class="brk-slot"><span class="brk-handle"></span></span><span class="brk-state">${it.on ? 'ON' : 'OFF'}</span>${it.tag ? `<span class="brk-tag">${it.tag}</span>` : ''}`;
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.panelFocus = i;
+        this.onPanelToggle?.(it.id);
+      });
+      row.appendChild(b);
+    });
+    this.panel.querySelector('.lamp')!.classList.toggle('lit', powered);
+    (this.panel.querySelector('.panel-status') as HTMLElement).textContent = powered ? 'SUPPLY OK' : 'NO SUPPLY';
+  }
+
+  private movePanelFocus(d: number) {
+    this.panelFocus = (this.panelFocus + d + this.panelItems.length) % this.panelItems.length;
+    this.panel.querySelectorAll('.brk').forEach((b, i) => b.classList.toggle('focus', i === this.panelFocus));
+  }
+
+  closePanel() {
+    if (!this.panelOpen) return;
+    this.panelOpen = false;
+    this.panel.classList.remove('in');
+    setTimeout(() => this.panel.classList.add('hidden'), 300);
+    const cb = this.onPanelClose;
+    this.onPanelClose = null;
+    cb?.();
+  }
+
+  // ---------------------------------------------------------------- binoculars, credits, saved
+  setBinoculars(on: boolean) {
+    this.binoc.classList.toggle('hidden', !on);
+    (this.binoc.querySelector('.binoc-hint') as HTMLElement).textContent = on ? (this.touchUI ? 'Tap to lower the binoculars' : 'E to lower the binoculars') : '';
+    this.hud.classList.toggle('dim', on);
+  }
+
+  showCredits(html: string, onAgain: () => void) {
+    this.credits.innerHTML = `<div class="cr-inner">${html}<div class="cr-actions"><button class="btn" id="btn-again">Play again</button></div></div>`;
+    this.credits.classList.remove('hidden');
+    requestAnimationFrame(() => this.credits.classList.add('in'));
+    (this.credits.querySelector('#btn-again') as HTMLButtonElement).onclick = () => onAgain();
+    this.hud.classList.add('hidden');
+    this.touch.classList.add('hidden');
+  }
+
+  saved() {
+    this.savedEl.classList.add('on');
+    setTimeout(() => this.savedEl.classList.remove('on'), 2200);
+  }
+
+  /** Gamepad control for overlays (documents, panel, notebook) while gameplay input is paused. */
+  private pollPad() {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const p = Array.from(pads).find((g) => g && g.connected);
+    if (!p) return;
+    const edge = (i: number) => {
+      const down = !!p.buttons[i]?.pressed;
+      const e = down && !this.padPrev[i];
+      this.padPrev[i] = down;
+      return e;
+    };
+    const a = edge(0),
+      b = edge(1),
+      l = edge(14),
+      r = edge(15);
+    if (this.panelOpen) {
+      if (l) this.movePanelFocus(-1);
+      if (r) this.movePanelFocus(1);
+      if (a) this.onPanelToggle?.(this.panelItems[this.panelFocus].id);
+      if (b) this.closePanel();
+    } else if (this.docOpen) {
+      if (a || b) this.closeDoc();
     }
   }
 

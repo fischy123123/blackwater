@@ -78,10 +78,13 @@ void main() {
   vec3 p = position;
   vec4 wp = modelMatrix * vec4(p, 1.0);
   float h = max(wp.y + 20.0, 0.0);
-  // lean forward (toward the shore, -z) as it collapses; the top goes first
-  float k = uCollapse * uCollapse;
-  wp.z -= k * h * h * 0.012 + k * 180.0;
-  wp.y -= k * h * 0.55;
+  // Collapse: the top comes down first and the mass surges toward the shore (-z) as it falls.
+  float k = smoothstep(0.0, 1.0, uCollapse);
+  float fall = clamp(k * 1.7 - (1.0 - h / 330.0) * 0.7, 0.0, 1.0);
+  fall = fall * fall * (3.0 - 2.0 * fall);
+  wp.y = -20.0 + h * (1.0 - fall * 0.96);
+  wp.z -= fall * (30.0 + h * 0.45) + k * 50.0;
+  wp.z -= sin(wp.x * 0.004 + 1.3) * 40.0 * fall;
   // slow internal slump
   wp.z += sin(wp.x * 0.01 + uTime * 0.2) * 0.4 * (1.0 - k);
   vWorld = wp.xyz;
@@ -96,48 +99,100 @@ ${GLSL_FOG_FN}
 uniform float uTime;
 uniform vec4 uTouch;
 uniform vec3 uSunColor2;
+uniform vec3 uSunColorW;
 uniform float uCollapse;
 varying vec3 vWorld;
 varying vec3 vN;
 varying vec2 vUv;
+
+// a slow whale: elongated body with a tail fluke, in wall-plane coordinates (metres)
+float whale(vec2 p, vec2 c, float s) {
+  vec2 q = (p - c) / s;
+  float body = length(q * vec2(0.13, 0.55)) - 1.0;
+  vec2 t = q - vec2(-9.0, 0.3 * sin(uTime * 0.6));
+  float tail = length(t * vec2(0.9, 0.35)) - 1.0;
+  float fin = length((q - vec2(2.0, -1.2)) * vec2(0.6, 1.2)) - 1.0;
+  return min(min(body, tail), fin);
+}
+
 void main() {
   vec3 V = normalize(vWorld - cameraPosition);
   vec3 n = normalize(vN);
   if (dot(n, V) > 0.0) n = -n;
-  // surface ripples (slow, vertical) + touch rings
-  vec2 q = vec2(vWorld.x, vWorld.y);
-  float w1 = bwFbm(q * 0.05 + vec2(0.0, uTime * 0.08));
-  float w2 = bwFbm(q * 0.21 + vec2(uTime * 0.03, uTime * 0.2));
-  vec3 pert = vec3((w1 - 0.5) * 0.25 + (w2 - 0.5) * 0.12, (w2 - 0.5) * 0.15, 0.0);
+  float t = uTime;
+  vec2 q = vWorld.xy;
+  // slow, heavy undulation of the face + finer flowing texture
+  float f1 = bwFbm(q * vec2(0.012, 0.004) + vec2(0.0, t * 0.03));
+  float f2 = bwFbm(q * vec2(0.06, 0.02) + vec2(t * 0.02, t * 0.16));
+  float f3 = bwFbm(q * vec2(0.3, 0.09) + vec2(0.0, t * 0.6));
+  vec2 pert = vec2((f1 - 0.5) * 0.5 + (f2 - 0.5) * 0.25 + (f3 - 0.5) * 0.1, (f2 - 0.5) * 0.3 + (f1 - 0.5) * 0.2);
   if (uTouch.w > 0.0) {
     float d = distance(vWorld, uTouch.xyz);
-    float ring = sin(d * 2.4 - uTouch.w * 6.0) * exp(-d * 0.05) * exp(-uTouch.w * 0.25) * smoothstep(uTouch.w * 8.0 + 2.0, uTouch.w * 8.0 - 6.0, d);
-    pert.xy += normalize(vWorld.xy - uTouch.xy + 1e-3) * ring * 0.6;
+    float front = uTouch.w * 9.0;
+    float ring = sin(d * 1.6 - uTouch.w * 7.0) * exp(-d * 0.012) * smoothstep(front + 3.0, front - 25.0, d) * exp(-uTouch.w * 0.08);
+    pert += normalize(vWorld.xy - uTouch.xy + 1e-3) * ring * 0.9;
   }
-  n = normalize(n + pert);
+  n = normalize(n + vec3(pert.x, pert.y, 0.0));
   float ndv = clamp(dot(-V, n), 0.0, 1.0);
   float F = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
   vec3 R = reflect(V, n);
-  vec3 refl = textureLod(uSkyCube, R, 0.5).rgb * uSkyExposure;
-  // inside the wall: a deep, sunlit green-blue volume with suspended life and shafts of light
-  float depthGlow = clamp((vWorld.y + 20.0) / 260.0, 0.0, 1.0);
-  vec3 deep = vec3(0.01, 0.06, 0.07);
-  vec3 lit = vec3(0.1, 0.55, 0.55);
-  float sunThrough = pow(max(dot(-V, uSunDir), 0.0), 3.0) * 0.8 + 0.25;
-  float shafts = pow(bwVNoise(vec2(vWorld.x * 0.02 + vWorld.y * 0.01, uTime * 0.05)), 3.0);
-  vec3 body = mix(deep, lit, depthGlow * 0.8 + shafts * 0.3) * uSunColor2 * (0.35 + sunThrough);
-  // suspended particles / fish silhouettes drifting
-  vec2 pc = vec2(vWorld.x * 0.08, vWorld.y * 0.08 + uTime * 0.05);
-  float specks = step(0.985, bwHash12(floor(pc * 3.0))) * 0.6;
-  float fish = step(0.9985, bwHash12(floor(vec2(vWorld.x * 0.05 + uTime * 0.12, vWorld.y * 0.12)))) ;
-  body += vec3(0.4, 0.7, 0.7) * specks * uSunColor2 * 0.05;
-  body = mix(body, body * 0.15, fish);
-  // foam lip at the top edge and where it meets the seabed
-  float top = smoothstep(0.985, 1.0, vUv.y);
-  float base = smoothstep(0.03, 0.0, vUv.y);
-  vec3 col = mix(body, refl, F) + vec3(0.9) * (top + base * 0.6) * uSunColor2 * 0.2;
+  vec3 refl = textureLod(uSkyCube, R, 1.5).rgb * uSkyExposure;
+
+  // ---- inside the water
+  float h01 = clamp((vWorld.y + 20.0) / 330.0, 0.0, 1.0);
+  vec3 absorb = vec3(0.35, 0.065, 0.045);
+  vec3 skyUp = textureLod(uSkyCube, vec3(0.0, 1.0, 0.0), 6.0).rgb * uSkyExposure;
+  vec3 skyFar = textureLod(uSkyCube, normalize(vec3(V.x, 0.25, V.z)), 6.0).rgb * uSkyExposure;
+  // light filtering down from the crest, and through from the open sea behind the wall
+  vec3 down = skyUp * exp(-absorb * (1.0 - h01) * 330.0 * 0.08) * 0.8;
+  vec3 through = skyFar * exp(-absorb * 9.0) * 1.6;
+  float sunPh = pow(max(dot(V, uSunDir), 0.0), 5.0);
+  vec3 sunIn = uSunColorW * exp(-absorb * (4.0 + (1.0 - h01) * 10.0)) * (0.02 + 0.35 * sunPh);
+  // god rays slanting down through the body
+  vec2 rq = vec2(vWorld.x * 0.012 + vWorld.y * 0.009 * (uSunDir.x > 0.0 ? 1.0 : -1.0), t * 0.025);
+  float shafts = pow(bwVNoise(rq), 3.0) * 1.6 + pow(bwVNoise(rq * 2.7 + 5.0), 4.0);
+  vec3 body = down + through + sunIn * (0.5 + shafts * 2.2);
+  body *= mix(vec3(0.55, 1.0, 0.95), vec3(0.8, 1.0, 1.0), h01);
+  body *= mix(0.3, 1.0, pow(h01, 0.6));
+  // water sliding down the face in slow glassy ribbons
+  float ribbon = pow(bwVNoise(vec2(vWorld.x * 0.35 + f1 * 3.0, vWorld.y * 0.015 + t * 0.35)), 5.0);
+  body += (down * 0.3 + sunIn * 0.6) * ribbon;
+
+  // parallax layers of drifting particles and fish, deeper = dimmer
+  vec2 vp = V.xy / max(abs(V.z), 0.25);
+  float specks = 0.0, fish = 0.0;
+  for (int i = 0; i < 3; i++) {
+    float depth = 6.0 + float(i) * 22.0;
+    vec2 p = q + vp * depth;
+    vec2 cell = floor(p * vec2(0.25, 0.25) + vec2(0.0, t * 0.02 * (1.0 + float(i))));
+    specks += step(0.992, bwHash12(cell + float(i) * 17.0)) * (1.0 - float(i) * 0.3);
+    // schools: dense bands of tiny dark shapes that drift sideways
+    vec2 sp = p * vec2(0.9, 2.2) + vec2(t * (0.8 + float(i) * 0.3), 0.0);
+    vec2 fc = fract(sp) - 0.5;
+    float band = smoothstep(0.55, 0.8, bwVNoise(p * 0.01 + vec2(t * 0.01, float(i) * 3.0)));
+    float isFish = step(0.9, bwHash12(floor(sp) + float(i) * 31.0));
+    fish += isFish * smoothstep(0.32, 0.18, length(fc * vec2(1.0, 2.4))) * band * (1.0 - float(i) * 0.25);
+  }
+  body += vec3(0.5, 0.8, 0.8) * specks * (down + sunIn) * 0.35;
+  body *= 1.0 - clamp(fish, 0.0, 1.0) * 0.55;
+  // a whale, very large and very slow
+  float wd = whale(q + vp * 45.0, vec2(-190.0 + mod(t * 1.3, 900.0) - 450.0, 150.0 + sin(t * 0.02) * 20.0), 5.5);
+  body *= mix(0.35, 1.0, smoothstep(-0.3, 0.4, wd));
+
+  vec3 col = mix(body, refl, F);
+  // sun glints on the moving face
+  vec3 Hs = normalize(uSunDir - V);
+  col += uSunColorW * pow(max(dot(n, Hs), 0.0), 400.0) * 0.08;
+  // crest high above catches the light; churn and spray at the foot
+  float top = smoothstep(0.975, 1.0, vUv.y);
+  float foot = smoothstep(0.06, 0.0, vUv.y) * (0.5 + 0.5 * bwFbm(vec2(vWorld.x * 0.08, t * 0.8)));
+  col += (uSunColorW * 0.05 + skyUp * 0.6) * top;
+  col = mix(col, (skyUp * 0.5 + uSunColorW * 0.04) * 0.9, clamp(foot * 0.8, 0.0, 1.0));
+  // collapsing: churned white water and spray
+  float churn = smoothstep(0.35, 0.75, bwFbm(vec2(vWorld.x * 0.02, vWorld.y * 0.03 - t * 0.6)));
+  col = mix(col, (skyUp * 0.6 + uSunColorW * 0.05) * 0.9, clamp(uCollapse * 1.4, 0.0, 1.0) * (0.35 + 0.65 * churn));
   col = bwApplyFog(col, vWorld);
-  float alpha = 0.97;
+  float alpha = 0.985 * (1.0 - smoothstep(0.72, 1.0, uCollapse));
   gl_FragColor = vec4(col, alpha);
 }`;
 
@@ -692,6 +747,7 @@ export function buildPlaces(scene: THREE.Scene, collision: CollisionWorld, light
       uTime: U.uTime,
       uTouch: { value: new THREE.Vector4(0, 0, 0, -1) },
       uSunColor2: { value: new THREE.Color(1, 1, 1) },
+      uSunColorW: U.uSunColor,
       uCollapse: { value: 0 },
     },
     transparent: true,

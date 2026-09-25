@@ -7,6 +7,7 @@ import type { TerrainData } from './TerrainGen';
 import { U, LAYER } from '../render/Globals';
 import { GLSL_FOG_FN, GLSL_FOG_UNIFORMS, GLSL_NOISE } from '../render/Chunks';
 import { clamp, lerp, smoothstep } from '../core/math';
+import { TERRAIN_HEIGHT_GLSL } from './Terrain';
 
 export const WATER_VERT = /* glsl */ `
 attribute vec3 aFlow; // xy = flow dir * speed, z = foam/turbulence
@@ -15,8 +16,23 @@ varying vec3 vFlow;
 varying vec4 vClip;
 uniform float uWaveAmp;
 uniform float uTime;
+uniform float uFlood;    // 1: surface follows the returning sea (front, bore, level)
+uniform float uFrontZ;
+uniform float uSeaLevel;
+uniform float uBoreH;
+${TERRAIN_HEIGHT_GLSL}
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
+  if (uFlood > 0.5) {
+    float d = wp.z - uFrontZ;
+    float g = bwTerrainHeight(wp.xz);
+    // a breaking bore at the leading edge, then a sheet that thins toward the back
+    float bore = uBoreH * smoothstep(-3.0, 12.0, d) * (1.0 - smoothstep(12.0, 170.0, d));
+    bore += 0.35 * smoothstep(-3.0, 4.0, d) * (1.0 - smoothstep(60.0, 260.0, d));
+    bore += sin(wp.x * 0.05 + uTime * 1.3) * 0.4 * uBoreH * 0.25 * smoothstep(0.0, 20.0, d) * (1.0 - smoothstep(20.0, 200.0, d));
+    float surf = max(uSeaLevel, g + bore);
+    wp.y = (d < -3.0 || surf < g + 0.02) ? g - 3.0 : surf;
+  }
   if (uWaveAmp > 0.0) {
     // gentle Gerstner swell for open water
     vec2 d1 = normalize(vec2(0.3, 1.0)), d2 = normalize(vec2(-0.6, 0.8)), d3 = normalize(vec2(0.9, 0.4));
@@ -94,7 +110,10 @@ vec3 sampleNormal(vec2 p, vec2 flow, float t) {
   return vec3(n.x, 1.0, n.y);
 }
 
+uniform float uFlood;
+uniform float uFrontZ;
 void main() {
+  if (uFlood > 0.5 && vWorld.z < uFrontZ - 2.0) discard;
   vec3 V = cameraPosition - vWorld;
   float dist = length(V);
   V /= dist;
@@ -189,6 +208,12 @@ void main() {
   float foamEdge = smoothstep(0.35, 0.0, thick) * (0.5 + 0.5 * bwFbm(vWorld.xz * 1.3 + uTime * 0.2));
   float foamT = vFlow.z * smoothstep(0.35, 0.8, bwFbm(vWorld.xz * 0.9 - vFlow.xy * uTime * 1.5));
   float foam = clamp(foamEdge * uFoamK + foamT, 0.0, 1.0);
+  if (uFlood > 0.5) {
+    float fd = vWorld.z - uFrontZ;
+    float churn = bwFbm(vWorld.xz * vec2(0.15, 0.3) + vec2(0.0, uTime * 2.0));
+    float ff = smoothstep(90.0, 0.0, fd) * (0.55 + 0.6 * churn) + smoothstep(250.0, 60.0, fd) * 0.35 * smoothstep(0.55, 0.8, churn);
+    foam = clamp(max(foam, ff), 0.0, 1.0);
+  }
   col = mix(col, (uAmbient * 0.9 + uSunColor * max(uSunDir.y, 0.0) * 0.25) * 0.85, foam * 0.85);
   col = bwApplyFog(col, vWorld);
   // soft shoreline alpha
@@ -228,6 +253,11 @@ export function makeWaterMaterial(normalTex: THREE.Texture, sceneTex: () => THRE
       uFoamK: { value: o.foam ?? 0.6 },
       uNormalScale: { value: o.normalScale ?? 0.35 },
       uWaveAmp: { value: o.waveAmp ?? 0 },
+      uFlood: { value: 0 },
+      uFrontZ: { value: 1e6 },
+      uSeaLevel: { value: -100 },
+      uBoreH: { value: 0 },
+      uHeightTex: U.uHeightTex,
       uSkyExposure2: U.uSkyExposure,
       uFlashOn: U.uFlashOn,
       uFlashPos: U.uFlashPos,
@@ -417,10 +447,46 @@ export function buildRiver(t: TerrainData, heightAt: (x: number, z: number) => n
 
 /** Big sea plane (the returning tide). */
 export function buildSea(): THREE.BufferGeometry {
-  const g = new THREE.PlaneGeometry(30000, 30000, 160, 160);
-  g.rotateX(-Math.PI / 2);
-  const n = g.attributes.position.count;
-  g.setAttribute('aFlow', new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3));
+  // Non-uniform grid: ~9 m spacing over the bay (for the flood bore), stretching to the horizon.
+  const axis = (a0: number, a1: number, step: number, far: number) => {
+    const v: number[] = [];
+    for (let x = a0; x <= a1 + 1e-6; x += step) v.push(x);
+    let s = step;
+    let lo = a0,
+      hi = a1;
+    while (lo > -far || hi < far) {
+      s *= 1.35;
+      if (lo > -far) v.unshift((lo -= s));
+      if (hi < far) v.push((hi += s));
+    }
+    return v;
+  };
+  const xs = axis(-1400, 1400, 9, 16000);
+  const zs = axis(-150, 1500, 9, 16000);
+  const nx = xs.length,
+    nz = zs.length;
+  const pos = new Float32Array(nx * nz * 3);
+  for (let j = 0; j < nz; j++)
+    for (let i = 0; i < nx; i++) {
+      const k = (j * nx + i) * 3;
+      pos[k] = xs[i];
+      pos[k + 1] = 0;
+      pos[k + 2] = zs[j];
+    }
+  const idx: number[] = [];
+  for (let j = 0; j < nz - 1; j++)
+    for (let i = 0; i < nx - 1; i++) {
+      const a = j * nx + i,
+        b = a + 1,
+        c = a + nx,
+        d = c + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('aFlow', new THREE.Float32BufferAttribute(new Float32Array(nx * nz * 3), 3));
+  g.setIndex(nx * nz > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
+  g.computeBoundingSphere();
   return g;
 }
 

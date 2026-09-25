@@ -416,6 +416,7 @@ house('keeper', -474, 506, 0.2, -1, 0xe9e5dc, {
 {
   const k = BUILDINGS[BUILDINGS.length - 1];
   k.light = 61;
+  k.pad.y = 41.0; // same level as the lighthouse lawn (the auto height lands in a gully)
 }
 
 // Pads registered above get their y assigned during terrain generation.

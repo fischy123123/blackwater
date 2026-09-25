@@ -424,9 +424,23 @@ export function generateTerrain(onProgress?: (p: number) => void): TerrainData {
   // --- 4. Pads (building lots, yards, overlook) ----------------------------
   for (const p of PADS) {
     if (Number.isNaN(p.y)) {
-      const ci = clamp(Math.round((p.x - minX) / cell), 0, res - 1);
-      const cj = clamp(Math.round((p.z - minZ) / cell), 0, res - 1);
-      p.y = height[cj * res + ci] + 0.35;
+      // balance cut and fill: mean height over the footprint
+      const cr = Math.cos(p.rot),
+        sr = Math.sin(p.rot);
+      let sum = 0,
+        n = 0;
+      for (let a = -2; a <= 2; a++)
+        for (let b = -2; b <= 2; b++) {
+          const lx = (a / 2) * p.w * 0.5,
+            lz = (b / 2) * p.d * 0.5;
+          const wx = p.x + lx * cr - lz * sr,
+            wz = p.z + lx * sr + lz * cr;
+          const ci = clamp(Math.round((wx - minX) / cell), 0, res - 1);
+          const cj = clamp(Math.round((wz - minZ) / cell), 0, res - 1);
+          sum += height[cj * res + ci];
+          n++;
+        }
+      p.y = sum / n + 0.35;
     }
     const c = Math.cos(p.rot),
       s = Math.sin(p.rot);

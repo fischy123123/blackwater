@@ -268,6 +268,7 @@ export class AudioEngine {
   }
 
   setPos(p: PannerNode, pos: THREE.Vector3) {
+    if (!this.ctx) return;
     if (p.positionX) {
       p.positionX.value = pos.x;
       p.positionY.value = pos.y;
@@ -337,6 +338,7 @@ export class AudioEngine {
     wetLarge?: number;
     rate?: number;
   }) {
+    if (!this.ctx) return;
     const ctx = this.ctx!;
     const t = opts.when ?? this.now;
     const src = this.noise(opts.type ?? 'white', false);
@@ -355,6 +357,7 @@ export class AudioEngine {
   }
 
   tone(opts: { f: number; type?: OscillatorType; attack?: number; decay: number; gain: number; when?: number; fEnd?: number; pos?: THREE.Vector3; bus?: GainNode; wet?: number; wetLarge?: number; hold?: number }) {
+    if (!this.ctx) return;
     const ctx = this.ctx!;
     const t = opts.when ?? this.now;
     const o = ctx.createOscillator();
@@ -480,6 +483,7 @@ export class AudioEngine {
   }
 
   click(pos?: THREE.Vector3, gain = 0.25) {
+    if (!this.ctx) return;
     this.burst({ type: 'white', f: 3500, q: 2, decay: 0.015, gain, pos });
   }
 
@@ -688,6 +692,7 @@ export class AudioEngine {
   }
 
   splash(pos: THREE.Vector3, gain = 0.5) {
+    if (!this.ctx) return;
     this.burst({ type: 'white', f: 1400, q: 0.6, decay: 0.5, attack: 0.01, gain, pos, fEnd: 500 });
   }
 }

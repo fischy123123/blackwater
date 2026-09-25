@@ -17,6 +17,9 @@ import '../world/TownPlan'; // registers building lots before terrain generation
 import { buildTown, type TownResult } from '../world/Town';
 import { LightManager } from '../world/Lights';
 import { dressWorld, SHARED_MATS, type DressingResult } from '../world/Dressing';
+import { buildPlaces, type PlacesResult } from '../world/Places';
+import { furnishAll, type InteriorResult } from '../world/Interiors';
+import { WeatherFX } from '../world/Weather';
 
 export type World = {
   data: TerrainData;
@@ -31,6 +34,9 @@ export type World = {
   town: TownResult;
   lights: LightManager;
   dressing: DressingResult;
+  places: PlacesResult;
+  interiors: InteriorResult;
+  weather: WeatherFX;
   exclusions: Exclusion[];
   updaters: ((dt: number, camera: THREE.PerspectiveCamera) => void)[];
 };
@@ -139,6 +145,13 @@ export async function buildWorld(engine: Engine, progress: (p: number, label: st
   const lights = new LightManager(scene, q.pointLights);
   Object.assign(SHARED_MATS, town.materials);
   const dressing = dressWorld(scene, texgen, collision, lights, terrain, forest.variants[1], forest.staticMaterials(1));
+  progress(0.87, 'Lighting the lamp');
+  await frame();
+  const places = buildPlaces(scene, collision, lights, terrain);
+  const interiors = furnishAll(town.byId, collision, lights, scene);
+  const weather = new WeatherFX(engine.renderer, scene, q.rainCount, env, lights);
+  for (const g of [town.group, places.group, dressing.group, roads.group]) weather.addOccluders(g);
+  weather.forestAt = (x, z) => terrain.surfaceAt(x, z).forest;
 
   progress(0.9, 'Waiting for the tide');
   await frame();
@@ -153,5 +166,5 @@ export async function buildWorld(engine: Engine, progress: (p: number, label: st
     scene.environment = sky.envTexture;
   });
 
-  return { data, terrain, sky, env, texgen, forest, roads, collision, water: { flats, river, sea, normal: waterTex.normal }, town, lights, dressing, exclusions, updaters };
+  return { data, terrain, sky, env, texgen, forest, roads, collision, water: { flats, river, sea, normal: waterTex.normal }, town, lights, dressing, places, interiors, weather, exclusions, updaters };
 }
