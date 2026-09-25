@@ -319,9 +319,17 @@ vec3 starField(vec3 d) {
   return tint * s * 0.35 + vec3(0.55, 0.6, 0.75) * mw * 0.0028;
 }
 
+uniform float uCubeTexel; // angular size of one cube texel (radians)
+
 void main() {
   vec3 rd = normalize(vDir);
-  vec4 sky = textureLod(uSkyCube, rd, 0.0);
+  // tent-filtered lookup: hides the cube's texel grid where clouds are magnified
+  vec3 t1 = normalize(cross(rd, abs(rd.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+  vec3 t2 = cross(rd, t1);
+  float e = uCubeTexel * 0.7;
+  vec4 sky = textureLod(uSkyCube, rd, 0.0) * 0.36
+    + (textureLod(uSkyCube, normalize(rd + (t1 + t2) * e), 0.0) + textureLod(uSkyCube, normalize(rd + (t1 - t2) * e), 0.0)
+     + textureLod(uSkyCube, normalize(rd - (t1 + t2) * e), 0.0) + textureLod(uSkyCube, normalize(rd - (t1 - t2) * e), 0.0)) * 0.16;
   vec3 col = sky.rgb;
   float cloudT = sky.a;
   // Sun disk with limb darkening
@@ -500,6 +508,7 @@ export class SkySystem {
         uSunRadiance: { value: new THREE.Color() },
         uMoonRadiance: { value: new THREE.Color() },
         uStars: { value: 0 },
+        uCubeTexel: { value: Math.PI / 2 / opts.cubeSize },
         uStarRot: { value: 0 },
         uLightningDir: { value: new THREE.Vector3(0, 0.3, 1) },
         uTimeD: U.uTime,

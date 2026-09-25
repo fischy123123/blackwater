@@ -18,7 +18,7 @@ declare global {
 const TITLE_SHOTS: { from: THREE.Vector3; to: THREE.Vector3; look0: THREE.Vector3; look1: THREE.Vector3; dur: number }[] = [
   { from: new THREE.Vector3(-150, 38, 470), to: new THREE.Vector3(-60, 32, 380), look0: new THREE.Vector3(30, 18, 80), look1: new THREE.Vector3(40, 16, 60), dur: 34 },
   { from: new THREE.Vector3(-420, 70, 380), to: new THREE.Vector3(-380, 62, 430), look0: new THREE.Vector3(-484, 50, 560), look1: new THREE.Vector3(-484, 52, 560), dur: 28 },
-  { from: new THREE.Vector3(-230, 112, -470), to: new THREE.Vector3(-200, 106, -440), look0: new THREE.Vector3(-40, 10, 300), look1: new THREE.Vector3(-20, 10, 360), dur: 30 },
+  { from: new THREE.Vector3(-250, 158, -540), to: new THREE.Vector3(-205, 150, -500), look0: new THREE.Vector3(-40, 10, 300), look1: new THREE.Vector3(-20, 10, 360), dur: 30 },
 ];
 
 async function boot() {

@@ -411,10 +411,18 @@ export function bakeGuardrail(b: MeshBatcher, pts: THREE.Vector3[]) {
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i],
       c = pts[i + 1];
-    b.color.setRGB(0.62, 0.64, 0.62);
-    b.beam('metal', a.clone().setY(a.y + 0.62), c.clone().setY(c.y + 0.62), 0.05, 0.32);
+    // galvanised W-beam: two thick corrugations either side of a recessed valley
+    const w = 0.93 + ((i * 7) % 5) * 0.02;
+    const rail = (dy: number, thick: number, h: number, shade: number) => {
+      b.color.setRGB(0.44 * w * shade, 0.46 * w * shade, 0.45 * w * shade);
+      b.beam('metal', a.clone().setY(a.y + dy), c.clone().setY(c.y + dy), thick, h);
+    };
+    rail(0.535, 0.075, 0.11, 1.0);
+    rail(0.62, 0.035, 0.08, 0.72);
+    rail(0.705, 0.075, 0.11, 1.0);
     b.color.setRGB(0.4, 0.33, 0.25);
     b.box('pole', a.x, a.y + 0.35, a.z, 0.15, 0.95, 0.2);
+    b.box('pole', a.x, a.y + 0.62, a.z, 0.2, 0.3, 0.12);
   }
   const l = pts[pts.length - 1];
   b.color.setRGB(0.4, 0.33, 0.25);

@@ -68,7 +68,7 @@ export function settingsFor(tier: Tier, mobile: boolean): QualitySettings {
       msaa: 4,
       shadowMapSize: 1024,
       shadowFar: 70,
-      skyCube: 128,
+      skyCube: 160,
       skySteps: 10,
       skyFacesPerFrame: 1,
       terrainDetail: 0.8,

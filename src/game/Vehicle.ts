@@ -5,6 +5,7 @@ import type { CollisionWorld } from '../world/Collision';
 import type { Input } from '../core/Input';
 import { audio } from '../audio/AudioEngine';
 import { clamp, damp, lerp, wrapAngle } from '../core/math';
+import { injectGlobals } from '../render/Chunks';
 
 export class Truck {
   root = new THREE.Group();
@@ -32,12 +33,42 @@ export class Truck {
   surfaceRough: (x: number, z: number) => number;
   private crashCooldown = 0;
   private lampMat: THREE.MeshStandardMaterial;
+  private cabCenter = { value: new THREE.Vector3() };
 
   constructor(scene: THREE.Scene, groundAt: (x: number, z: number) => number, surfaceRough: (x: number, z: number) => number, shadowHeadlight: boolean) {
     this.groundAt = groundAt;
     this.surfaceRough = surfaceRough;
     const p = carParts('pickup');
     const paint = new THREE.MeshPhysicalMaterial({ color: 0xd8d6cc, roughness: 0.4, metalness: 0.1, clearcoat: 0.6, clearcoatRoughness: 0.3 });
+    // surfaces facing into the cab (inner pillars, roof liner) read as dark trim
+    paint.onBeforeCompile = (shader) => {
+      injectGlobals(shader);
+      shader.uniforms.uCabCenter = this.cabCenter;
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vCabW;\nvarying vec3 vCabN;')
+        .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvCabW = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvCabN = normalize(mat3(modelMatrix) * objectNormal);');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform vec3 uCabCenter;\nvarying vec3 vCabW;\nvarying vec3 vCabN;')
+        .replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
+          vec3 bwToC = uCabCenter - vCabW;
+          float bwCabIn = (dot(vCabN, bwToC) > 0.0 && length(bwToC) < 1.7) ? 1.0 : 0.0;
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.045, 0.043, 0.04), bwCabIn);`,
+        )
+        .replace(
+          '#include <lights_physical_fragment>',
+          `#include <lights_physical_fragment>
+          if (bwCabIn > 0.5) {
+            material.roughness = 0.85;
+            material.specularColor *= 0.3;
+            #ifdef USE_CLEARCOAT
+              material.clearcoat = 0.0;
+            #endif
+          }`,
+        );
+    };
+    paint.customProgramCacheKey = () => 'bw-truck-paint';
     const glass = new THREE.MeshPhysicalMaterial({ color: 0x9fb0b6, roughness: 0.03, metalness: 0, transmission: 0, transparent: true, opacity: 0.22, depthWrite: false });
     const chrome = new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.18, metalness: 1 });
     const rubber = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.9 });
@@ -274,6 +305,7 @@ export class Truck {
     // subtle body roll from cornering
     this.body.rotation.x += -this.steer * Math.abs(this.speed) * 0.004;
     this.root.updateMatrixWorld(true);
+    this.cabCenter.value.set(-0.05, 1.35, 0).applyMatrix4(this.body.matrixWorld);
   }
 }
 

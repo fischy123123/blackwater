@@ -403,7 +403,7 @@ export class Story {
       verb: () => (this.flags.phoneRinging ? 'Answer' : 'Lift the receiver'),
       onUse: () => this.usePayphone(),
     });
-    const doc = (id: string, anchor: string, label: string, verb = 'Read', r = 2.2) =>
+    const doc = (id: string, anchor: string, label: string, verb = 'Read', r = 2.6) =>
       this.add({ id: 'doc-' + id, pos: this.anchor(anchor), radius: r, label, verb, enabled: walkOnly, onUse: () => this.readDoc(id) });
     doc('sheriffLog', 'sheriffLog', 'Deputy’s log');
     doc('dinerTicket', 'dinerTicket', 'Order ticket');
@@ -425,7 +425,7 @@ export class Story {
     this.add({
       id: 'jukebox',
       pos: this.anchor('jukebox'),
-      radius: 2.2,
+      radius: 2.6,
       label: 'Jukebox',
       verb: () => (this.flags.power ? 'Play' : 'Press a button'),
       onUse: () => {
@@ -436,7 +436,7 @@ export class Story {
     this.add({
       id: 'tv',
       pos: this.anchor('tv'),
-      radius: 2.2,
+      radius: 2.6,
       label: 'Television',
       verb: 'Switch on',
       onUse: () => {
@@ -448,7 +448,7 @@ export class Story {
     this.add({
       id: 'teacup',
       pos: this.anchor('teacup'),
-      radius: 1.8,
+      radius: 2.3,
       label: 'Teacup',
       verb: 'Look',
       onUse: () => this.say('Half full. Cold. A skin on top.'),
@@ -458,7 +458,7 @@ export class Story {
     this.add({
       id: 'panel',
       pos: this.anchor('panel'),
-      radius: 2.2,
+      radius: 2.6,
       label: 'Breaker panel',
       verb: 'Open',
       onUse: () => this.openPanel(),
@@ -494,7 +494,7 @@ export class Story {
     this.add({
       id: 'gateKey',
       pos: this.anchor('gateKey'),
-      radius: 2.2,
+      radius: 2.6,
       label: 'Key cabinet',
       verb: 'Take the gate key',
       enabled: () => walkOnly() && !this.flags.hasKey,
@@ -595,7 +595,7 @@ export class Story {
     this.add({
       id: 'recorder',
       pos: this.anchor('recorder'),
-      radius: 2.2,
+      radius: 2.6,
       label: 'Tape recorder',
       verb: 'Play',
       onUse: () => this.playRecorder(),
