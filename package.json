@@ -1,0 +1,22 @@
+{
+  "name": "blackwater",
+  "private": true,
+  "version": "1.0.0",
+  "description": "BLACKWATER — a cinematic first-person mystery that runs in the browser.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "build:single": "vite build --mode single && node scripts/inline.mjs",
+    "preview": "vite preview --host",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.6"
+  }
+}
