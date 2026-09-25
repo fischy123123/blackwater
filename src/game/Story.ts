@@ -10,6 +10,7 @@ import type { Game } from './Game';
 import type { Interactable } from './Interaction';
 import { DOCS, drawKidPicture, drawTideChart } from './Documents';
 import type { Line } from './Dialogue';
+import { RUN_SPEED } from './Player';
 import { audio } from '../audio/AudioEngine';
 import { ambience } from '../audio/Ambience';
 import { music } from '../audio/Music';
@@ -1697,7 +1698,8 @@ export class Story {
     // rubber-band the front to the player so the escape is tense but fair
     const gap = pz - this.front.z; // negative: the water is behind (south of) the player
     const onTower = this.player.pos.y > this.w.places.tower.base.y + 9;
-    let speed = 3.2 + clamp((this.front.z - pz - 22) * 0.12, -1.2, 5);
+    // cruises a little under running pace: sprinting opens a gap of ~35 m, walking gets caught
+    let speed = RUN_SPEED - 1.6 + clamp((this.front.z - pz - 22) * 0.12, -1.2, 5);
     if (onTower || this.front.z < this.w.places.tower.base.z - 30) speed = 12;
     this.front.speed = damp(this.front.speed, speed, 1.5, dt);
     this.front.z -= this.front.speed * dt;

@@ -10,6 +10,9 @@ export type Surface = 'grass' | 'forest' | 'gravel' | 'asphalt' | 'mud' | 'sand'
 export type PlayerMode = 'walk' | 'drive' | 'climb' | 'locked';
 
 const FLASH_CD = 2.2; // scene units (~candela * 1e-3)
+/** Ground speeds in m/s. Brisker than real walking: the valley is big and the story keeps moving. */
+export const WALK_SPEED = 3.2;
+export const RUN_SPEED = 6.4;
 
 export class Player {
   pos = new THREE.Vector3();
@@ -139,7 +142,7 @@ export class Player {
       this.roll = damp(this.roll, -inp.move.x * 0.012 + bobSide * amp * 0.12, 6, dt);
     }
     this.camera.rotation.set(this.pitch + shy, this.yaw + shx, this.roll, 'YXZ');
-    this.fovKick = damp(this.fovKick, this.moveSpeed > 3 ? 4 : 0, 3, dt);
+    this.fovKick = damp(this.fovKick, this.moveSpeed > (WALK_SPEED + RUN_SPEED) / 2 ? 4 : 0, 3, dt);
     const fov = this.baseFov + this.fovKick;
     if (Math.abs(this.camera.fov - fov) > 0.01) {
       this.camera.fov = fov;
@@ -178,7 +181,7 @@ export class Player {
     const inp = this.input;
     this.crouching = inp.crouch || this.world.ceilingAt(this.pos.x, this.pos.z, this.pos.y + 1.0) < this.pos.y + 1.75;
     const run = inp.sprint && !this.crouching && inp.move.y > 0.2;
-    let speed = (this.crouching ? 0.95 : run ? 4.3 : 1.65) * this.speedScale;
+    let speed = (this.crouching ? 1.5 : run ? RUN_SPEED : WALK_SPEED) * this.speedScale;
     // wading
     const wl = this.world.waterAt ? this.world.waterAt(this.pos.x, this.pos.z) : -1000;
     this.waterDepth = Math.max(0, wl - this.pos.y);
@@ -241,7 +244,8 @@ export class Player {
 
     // head bob + footsteps
     this.surface = this.waterDepth > 0.03 ? 'water' : this.surfaceAt(this.pos.x, this.pos.z, this.pos.y, gr.box);
-    const stride = run ? 1.05 : this.crouching ? 0.55 : 0.74;
+    // distance per footstep: sets the cadence of the bob and the steps (~2.4/s walking, ~3/s running)
+    const stride = run ? 2.05 : this.crouching ? 0.85 : 1.35;
     if (this.grounded && this.moveSpeed > 0.15) {
       this.bobPhase += (this.moveSpeed * dt * Math.PI) / stride;
       this.bobAmp = damp(this.bobAmp, run ? 0.05 : this.crouching ? 0.018 : 0.028, 6, dt);
@@ -254,7 +258,7 @@ export class Player {
     const sgn = Math.sign(Math.sin(this.bobPhase));
     if (sgn !== this.lastStepSign && sgn !== 0) {
       this.lastStepSign = sgn;
-      if (this.grounded && this.moveSpeed > 0.3) this.onStep?.(this.surface, clamp(this.moveSpeed / 4.3, 0.2, 1) * (this.crouching ? 0.5 : 1));
+      if (this.grounded && this.moveSpeed > 0.3) this.onStep?.(this.surface, clamp((this.moveSpeed - 1) / (RUN_SPEED - 1), 0.2, 1) * (this.crouching ? 0.5 : 1));
     }
   }
 }

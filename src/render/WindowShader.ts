@@ -51,18 +51,23 @@ void main() {
   vec3 V = normalize(vWorld - cameraPosition);
   vec3 t = normalize(cross(vec3(0.0, 1.0, 0.0), n));
   vec3 rd = vec3(dot(V, t), V.y, dot(V, -n));
-  float W = vSize.x, Hh = vSize.y, sill = vSize.z;
+  // vSize.z is the sill height above the building's ground floor; upper-storey rooms
+  // start at their own floor, so keep the sill at a plausible height above it and make
+  // sure the whole pane sits below the ceiling (the ray must start inside the room).
+  float W = vSize.x, Hh = vSize.y, sill = min(vSize.z, 0.95);
   float seed = vExtra.y;
   float roomD = vExtra.x;
-  float roomH = 2.75;
+  float roomH = max(2.75, sill + Hh + 0.25);
   float roomW = max(W * 2.4, 3.2);
   float xoff = (fract(seed * 7.13) - 0.5) * roomW * 0.35;
   vec3 ro = vec3((vUv.x - 0.5) * W, sill + vUv.y * Hh, 0.0);
-  // ray-box exit
-  float tx = ((rd.x > 0.0 ? roomW * 0.5 + xoff : -roomW * 0.5 + xoff) - ro.x) / (abs(rd.x) > 1e-4 ? rd.x : 1e-4);
-  float ty = ((rd.y > 0.0 ? roomH : 0.0) - ro.y) / (abs(rd.y) > 1e-4 ? rd.y : 1e-4);
+  // ray-box exit (sign-preserving epsilons so a near-zero component can't flip the exit plane)
+  float rx = rd.x >= 0.0 ? max(rd.x, 1e-4) : min(rd.x, -1e-4);
+  float ry = rd.y >= 0.0 ? max(rd.y, 1e-4) : min(rd.y, -1e-4);
+  float tx = ((rx > 0.0 ? roomW * 0.5 + xoff : -roomW * 0.5 + xoff) - ro.x) / rx;
+  float ty = ((ry > 0.0 ? roomH : 0.0) - ro.y) / ry;
   float tz = (roomD - ro.z) / max(rd.z, 1e-4);
-  float th = min(min(tx, ty), tz);
+  float th = max(min(min(tx, ty), tz), 0.0);
   vec3 hp = ro + rd * th;
   vec3 wall = palette(fract(seed * 13.7));
   vec3 col;
@@ -118,7 +123,7 @@ void main() {
   vec3 lampPos = vec3(xoff + (fract(seed * 5.3) - 0.5) * roomW * 0.4, 1.5, roomD * 0.6);
   float dl = length(hp - lampPos);
   float fall = 1.0 / (1.0 + dl * dl * 0.35);
-  vec3 radiance = col * (uInterior * lit * (0.25 + 1.4 * fall) + uAmbientIn * (0.25 + 0.75 * exp(-hp.z * 0.6)));
+  vec3 radiance = col * (uInterior * lit * (0.25 + 1.4 * fall) + uAmbientIn * (0.25 + 0.75 * exp(-max(hp.z, 0.0) * 0.6)));
   // visible lamp shade
   if (lit > 0.5) {
     vec3 lp = lampPos + vec3(0.0, 0.0, -0.01);

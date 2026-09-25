@@ -421,7 +421,7 @@ export class Game {
     const up = Math.max(inp.move.y, this.ui.touchUI ? 0.35 : 0) + (inp.sprint ? 0.2 : 0);
     const down = Math.min(inp.move.y, 0);
     const prev = c.t;
-    c.t = clamp(c.t + (up * 1.25 + down * 1.4) * dt / c.len, 0, 1);
+    c.t = clamp(c.t + (up * 1.8 + down * 2.0) * dt / c.len, 0, 1);
     const p = c.from.clone().lerp(c.to, c.t);
     this.player.pos.copy(p);
     // rung steps
