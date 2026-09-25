@@ -20,6 +20,7 @@ import { dressWorld, SHARED_MATS, type DressingResult } from '../world/Dressing'
 import { buildPlaces, type PlacesResult } from '../world/Places';
 import { furnishAll, type InteriorResult } from '../world/Interiors';
 import { WeatherFX } from '../world/Weather';
+import { GroundCover } from '../world/Grass';
 
 export type World = {
   data: TerrainData;
@@ -37,6 +38,7 @@ export type World = {
   places: PlacesResult;
   interiors: InteriorResult;
   weather: WeatherFX;
+  ground: GroundCover;
   exclusions: Exclusion[];
   updaters: ((dt: number, camera: THREE.PerspectiveCamera) => void)[];
 };
@@ -152,6 +154,7 @@ export async function buildWorld(engine: Engine, progress: (p: number, label: st
   const weather = new WeatherFX(engine.renderer, scene, q.rainCount, env, lights);
   for (const g of [town.group, places.group, dressing.group, roads.group]) weather.addOccluders(g);
   weather.forestAt = (x, z) => terrain.surfaceAt(x, z).forest;
+  const ground = new GroundCover(scene, terrain, q.grassRadius, q.grassDensity);
 
   progress(0.9, 'Waiting for the tide');
   await frame();
@@ -163,8 +166,9 @@ export async function buildWorld(engine: Engine, progress: (p: number, label: st
     forest.update(cam);
     lights.update(dt, cam.position, env.preExposure);
     sky.dome.position.copy(cam.position);
+    ground.update(cam);
     scene.environment = sky.envTexture;
   });
 
-  return { data, terrain, sky, env, texgen, forest, roads, collision, water: { flats, river, sea, normal: waterTex.normal }, town, lights, dressing, places, interiors, weather, exclusions, updaters };
+  return { data, terrain, sky, env, texgen, forest, roads, collision, water: { flats, river, sea, normal: waterTex.normal }, town, lights, dressing, places, interiors, weather, ground, exclusions, updaters };
 }

@@ -68,7 +68,7 @@ body {
 .title.in { opacity: 1; }
 .title.out { opacity: 0; transition: opacity 1.2s ease; }
 .title-inner { max-width: 640px; pointer-events: auto; }
-.title-word { margin: 0; font-family: var(--display); font-weight: 300; font-size: clamp(40px, 10vw, 104px); letter-spacing: 0.34em; line-height: 1; text-wrap: balance; color: #f1ece2; text-shadow: 0 2px 30px rgba(0, 0, 0, 0.4); }
+.title-word { margin: 0; font-family: var(--display); font-weight: 300; font-size: clamp(26px, 8vw, 104px); letter-spacing: 0.34em; white-space: nowrap; line-height: 1; text-wrap: balance; color: #f1ece2; text-shadow: 0 2px 30px rgba(0, 0, 0, 0.4); }
 .title-tag { margin: 18px 0 30px; font-family: var(--display); font-style: italic; font-weight: 400; font-size: clamp(17px, 2.6vw, 24px); color: rgba(241, 236, 226, 0.84); letter-spacing: 0.01em; }
 .title-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 .title-note { margin: 22px 0 0; font-size: 13px; color: var(--ink-faint); letter-spacing: 0.02em; }

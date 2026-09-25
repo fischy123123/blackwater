@@ -678,8 +678,8 @@ export class WeatherFX {
     const wind = new THREE.Vector2(env.windDir.x, env.windDir.y).multiplyScalar((1.5 + w.wind * 7) * (0.7 + env.gust * 0.6));
     this.rain.visible = rainAmt > 0.01;
     this.splash.visible = rainAmt > 0.05;
+    this.updateOcclusion(cam); // also used by ground cover
     if (this.rain.visible) {
-      this.updateOcclusion(cam);
       rm.uniforms.uCam.value.copy(cam);
       rm.uniforms.uT.value = T;
       rm.uniforms.uWindV.value.copy(wind);
@@ -722,7 +722,6 @@ export class WeatherFX {
     lm.uniforms.uT.value = T;
     lm.uniforms.uWindV.value.copy(wind).multiplyScalar(0.8);
     lm.uniforms.uAmount.value = this.leafAmount;
-    if (this.leaves.visible) this.updateOcclusion(cam);
 
     // moths: around the nearest warm lamps at night, when it's not pouring
     const night = smoothstep(-2, -8, Math.asin(env.sunDir.y) * 57.3);

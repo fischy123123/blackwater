@@ -85,6 +85,7 @@ ${GLSL_FOG_FN}
 uniform sampler2DArray tAlbedo;
 uniform sampler2DArray tNormal;
 uniform float uFrames;
+uniform float uAtlasSize;
 uniform vec3 uLightDir;
 uniform vec3 uLightColor;
 uniform float uLowQ;
@@ -109,17 +110,21 @@ void main() {
   vec2 f = vGrid - g0;
   vec4 a; vec4 n;
   if (uLowQ > 0.5) {
-    vec2 cell = g0 + step(vec2(bwIGN(gl_FragCoord.yx + 7.0)), f);
+    vec2 cell = g0 + step(vec2(0.5), f);
     a = frameA(cell);
     n = frameN(cell);
   } else {
     vec4 a00 = frameA(g0), a10 = frameA(g0 + vec2(1.0, 0.0)), a01 = frameA(g0 + vec2(0.0, 1.0)), a11 = frameA(g0 + vec2(1.0, 1.0));
     a = mix(mix(a00, a10, f.x), mix(a01, a11, f.x), f.y);
-    if (a.a < 0.5) discard;
     vec4 n00 = frameN(g0), n10 = frameN(g0 + vec2(1.0, 0.0)), n01 = frameN(g0 + vec2(0.0, 1.0)), n11 = frameN(g0 + vec2(1.0, 1.0));
     n = mix(mix(n00, n10, f.x), mix(n01, n11, f.x), f.y);
   }
-  if (a.a < 0.5) discard;
+  // Coverage-preserving alpha: boost with mip level, then sharpen for alpha-to-coverage.
+  vec2 texel = vQuad / uFrames * uAtlasSize;
+  float lod = max(0.0, 0.5 * log2(max(dot(dFdx(texel), dFdx(texel)), dot(dFdy(texel), dFdy(texel)))));
+  float alpha = a.a * (1.0 + lod * 0.3);
+  float cov = (alpha - 0.5) / max(fwidth(alpha), 1e-4) + 0.5;
+  if (cov < 0.02) discard;
   vec3 nl = normalize(n.xyz * 2.0 - 1.0);
   float c = cos(vYaw), s = sin(vYaw);
   vec3 N = normalize(vec3(c * nl.x + s * nl.z, nl.y, -s * nl.x + c * nl.z));
@@ -131,7 +136,7 @@ void main() {
   vec3 amb = textureLod(uSkyCube, normalize(N + vec3(0.0, 0.6, 0.0)), 5.0).rgb * uSkyExposure * 0.9;
   vec3 col = a.rgb * (uLightColor * (ndl * 0.85 + trans) * sh + amb * (0.35 + 0.65 * ao));
   col = bwApplyFog(col, vWorld);
-  gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(col, clamp(cov, 0.0, 1.0));
 }
 `;
 
@@ -245,6 +250,7 @@ export class Forest {
         tAlbedo: { value: this.atlas.albedo },
         tNormal: { value: this.atlas.normal },
         uFrames: { value: opts.frames },
+        uAtlasSize: { value: opts.atlasSize },
         uInfo: { value: this.infos },
         uNear: { value: opts.near },
         uLowQ: { value: opts.lowQ ? 1 : 0 },
@@ -274,7 +280,7 @@ export class Forest {
       side: THREE.DoubleSide,
       fog: false,
     });
-    this.impostorMat.alphaToCoverage = false;
+    this.impostorMat.alphaToCoverage = true;
 
     this.place(terrain, opts.exclusions, opts.density);
     this.buildImpostorCells();

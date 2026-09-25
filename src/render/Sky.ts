@@ -179,6 +179,7 @@ uniform float uStorm;
 uniform vec2 uCloudOffset;
 uniform float uCloudSteps;
 uniform float uTimeC;
+uniform float uJitterSeed;
 uniform vec3 uSunColorC; // sun (or moon) radiance for cloud lighting
 uniform mat4 uFaceInvViewProj;
 varying vec2 vUv;
@@ -214,7 +215,7 @@ vec4 clouds(vec3 rd, vec3 bg) {
   t1 = min(t1, t0 + 16000.0);
   int steps = int(uCloudSteps);
   float ds = (t1 - t0) / uCloudSteps;
-  float jitter = bwIGN(gl_FragCoord.xy);
+  float jitter = fract(bwIGN(gl_FragCoord.xy + uJitterSeed * vec2(5.588238, 3.1273)) + uJitterSeed * 0.618034);
   float T = 1.0;
   vec3 col = vec3(0.0);
   vec3 L = uSunDirW;
@@ -438,6 +439,7 @@ export class SkySystem {
         uCloudOffset: { value: this.cloudOffset },
         uCloudSteps: { value: opts.steps },
         uTimeC: { value: 0 },
+        uJitterSeed: { value: 0 },
         uSunColorC: { value: new THREE.Color() },
         uFaceInvViewProj: { value: new THREE.Matrix4() },
         uCamPos: { value: new THREE.Vector3() },
@@ -457,6 +459,15 @@ export class SkySystem {
         uTerrainInfo: U.uTerrainInfo,
       },
     );
+    // Temporal accumulation: each face update blends into the previous result with a new
+    // jitter, turning low-step raymarch noise into smooth clouds.
+    this.cubeMat.blending = THREE.CustomBlending;
+    this.cubeMat.blendEquation = THREE.AddEquation;
+    this.cubeMat.blendSrc = THREE.ConstantAlphaFactor;
+    this.cubeMat.blendDst = THREE.OneMinusConstantAlphaFactor;
+    this.cubeMat.blendSrcAlpha = THREE.ConstantAlphaFactor;
+    this.cubeMat.blendDstAlpha = THREE.OneMinusConstantAlphaFactor;
+    this.cubeMat.blendAlpha = 1;
     // phase function helper used by clouds
     this.cubeMat.fragmentShader = this.cubeMat.fragmentShader.replace(
       'vec4 clouds(',
@@ -513,9 +524,24 @@ export class SkySystem {
 
   /** Render the whole cube at once (e.g. after a teleport or on load). */
   renderAll() {
-    for (let i = 0; i < 6; i++) this.renderFace(i, i === 5);
+    // converge the accumulation: a hard reset, then several jittered passes per face
+    const passes = 6;
+    const r = this.renderer;
+    const prevTarget = r.getRenderTarget();
+    const prevAutoClear = r.autoClear;
+    r.autoClear = false;
+    for (let p = 0; p < passes; p++) {
+      this.cubeMat.blendAlpha = p === 0 ? 1 : 1 / (p + 1);
+      for (let i = 0; i < 6; i++) this.renderFace(i, p === passes - 1 && i === 5);
+    }
+    this.cubeMat.blendAlpha = this.accum;
+    r.setRenderTarget(prevTarget);
+    r.autoClear = prevAutoClear;
     this.updateEnv();
   }
+
+  /** Blend weight of each new cube update (lower = smoother, more lag). */
+  accum = 0.3;
 
   private renderFace(i: number, mips: boolean) {
     const r = this.renderer;
@@ -524,6 +550,8 @@ export class SkySystem {
     const m = this.cubeMat.uniforms.uFaceInvViewProj.value as THREE.Matrix4;
     m.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).invert();
     this.cubeRT.texture.generateMipmaps = mips;
+    const js = this.cubeMat.uniforms.uJitterSeed;
+    js.value = (js.value + 1) % 64;
     this.quad.material = this.cubeMat;
     r.setRenderTarget(this.cubeRT, i);
     this.quad.render(r);

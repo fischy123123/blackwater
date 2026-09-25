@@ -325,15 +325,32 @@ export function dressWorld(
       const mid = a.clone().add(c).multiplyScalar(0.5);
       collision.box(mid.x, mid.z, a.distanceTo(c), 0.3, Math.atan2(c.z - a.z, c.x - a.x), mid.y - 1, mid.y + 0.9, false, 'rail');
     }
-    // tower viewer (coin binoculars)
-    b.color.setRGB(0.2, 0.34, 0.3);
-    b.cylinder('metal', V(viewer.x, viewer.y, viewer.z), V(viewer.x, viewer.y + 1.1, viewer.z), 0.08, 0.06, 8);
-    b.pushTRS(viewer.x, viewer.y + 1.3, viewer.z, 0.3);
-    b.box('metal', 0, 0, 0, 0.5, 0.32, 0.4);
-    b.color.setRGB(0.1, 0.1, 0.1);
-    b.box('metal', -0.1, 0.02, 0.23, 0.12, 0.12, 0.1);
-    b.box('metal', 0.1, 0.02, 0.23, 0.12, 0.12, 0.1);
-    b.pop();
+    // tower viewer (coin binoculars), pointed out over the bay
+    {
+      const vy = Math.atan2(-(-60 - viewer.x), -(560 - viewer.z));
+      b.color.setRGB(0.16, 0.3, 0.25);
+      b.cylinder('metal', V(viewer.x, viewer.y - 0.02, viewer.z), V(viewer.x, viewer.y + 0.04, viewer.z), 0.26, 0.24, 14);
+      b.cylinder('metal', V(viewer.x, viewer.y + 0.04, viewer.z), V(viewer.x, viewer.y + 1.02, viewer.z), 0.085, 0.06, 12);
+      b.pushTRS(viewer.x, viewer.y + 1.0, viewer.z, vy);
+      b.box('metal', 0, 0.1, 0, 0.1, 0.2, 0.12);
+      // head: a rounded body lying across, objectives forward (-z), visor behind (+z)
+      const body = new THREE.CapsuleGeometry(0.16, 0.26, 6, 16).rotateZ(Math.PI / 2).scale(1, 0.95, 1.1);
+      b.color.setRGB(0.18, 0.34, 0.28);
+      b.geometry('metal', body, new THREE.Matrix4().makeTranslation(0, 0.34, 0));
+      b.color.setRGB(0.12, 0.2, 0.17);
+      for (const sx of [-0.1, 0.1]) {
+        b.cylinder('metal', V(sx, 0.34, -0.12), V(sx, 0.34, -0.27), 0.075, 0.08, 14);
+        b.color.setRGB(0.05, 0.06, 0.07);
+        b.cylinder('chrome', V(sx, 0.34, -0.27), V(sx, 0.34, -0.275), 0.066, 0.066, 14);
+        b.color.setRGB(0.12, 0.2, 0.17);
+      }
+      b.color.setRGB(0.06, 0.06, 0.06);
+      b.box('metal', 0, 0.36, 0.2, 0.34, 0.09, 0.08);
+      // coin box
+      b.color.setRGB(0.55, 0.5, 0.32);
+      b.box('metal', 0.26, 0.3, 0.02, 0.07, 0.12, 0.1);
+      b.pop();
+    }
     collision.circle(viewer.x, viewer.z, 0.3, viewer.y - 1, viewer.y + 1.6, 'viewer');
     // scenic sign
     const sign = makeSign(signTexture(['BLACKWATER BAY', 'SCENIC VIEWPOINT', 'ELEV. 330 FT'], { bg: '#5b3b24', fg: '#e9dcc0', border: '#e9dcc0', font: "'Cormorant Garamond', Georgia, serif" }), 2.2, 1.1, 1.0, true);

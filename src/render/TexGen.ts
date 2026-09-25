@@ -275,14 +275,16 @@ void m_asphalt(vec2 uv, out vec3 alb, out float rough, out float h, out float ao
   float grain = pn(uv * 512.0, vec2(512.0));
   vec4 ag = pvorCell(uv, vec2(96.0), 1.0);
   float stone = smoothstep(0.35, 0.2, ag.z) * step(0.55, ag.w);
-  vec3 v = pvor(uv, vec2(5.0, 3.0), 0.9);
-  float crack = smoothstep(0.035, 0.0, v.y - v.x) * smoothstep(0.55, 0.75, pfbm1(uv + 9.0, 6.0, 3));
+  // meandering hairline cracks (warped cell edges, only in patches)
+  vec2 wuv = uv + vec2(pfbm1(uv + 2.0, 8.0, 3), pfbm1(uv + 7.0, 8.0, 3)) * 0.07 - 0.035;
+  vec3 v = pvor(wuv, vec2(4.0, 3.0), 0.9);
+  float crack = smoothstep(0.018, 0.0, v.y - v.x) * smoothstep(0.64, 0.8, pfbm1(uv + 9.0, 6.0, 3));
   float patchM = smoothstep(0.8, 0.84, pfbm1(uv + 1.1, 3.0, 2)) * 0.6;
   vec3 base = mix(srgb(vec3(0.20, 0.20, 0.20)), srgb(vec3(0.30, 0.30, 0.29)), n1);
   base = mix(base, srgb(vec3(0.13, 0.13, 0.135)), patchM * 0.9);
   base *= 0.9 + 0.2 * grain;
   base = mix(base, srgb(vec3(0.36, 0.35, 0.33)) * (0.85 + 0.3 * ag.w), stone * 0.35);
-  alb = base * (1.0 - crack * 0.6);
+  alb = base * (1.0 - crack * 0.45);
   // oil / tyre darkening
   alb *= 1.0 - smoothstep(0.55, 0.9, n2) * 0.15;
   h = grain * 0.25 + stone * 0.15 + n1 * 0.05 - crack * 0.8 - patchM * 0.03;
