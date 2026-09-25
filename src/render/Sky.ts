@@ -343,7 +343,7 @@ void main() {
     vec3 mn = normalize(mx * mp.x + my * mp.y + uMoonDirW * z);
     float lit = clamp(dot(mn, normalize(uSunDir + uMoonDirW * 0.35)) * 1.2 + 0.25, 0.0, 1.0);
     float maria = 0.72 + 0.28 * smoothstep(0.35, 0.7, bwFbm(mp * 3.1 + 4.0));
-    col += uMoonRadiance * maria * lit * smoothstep(1.0, 0.92, mr) * (0.2 + 0.8 * cloudT);
+    col += uMoonRadiance * maria * lit * smoothstep(1.0, 0.92, mr) * cloudT * cloudT;
   }
   // Stars
   if (uStars > 0.0 && rd.y > -0.02) col += starField(rd) * uStars * cloudT * smoothstep(-0.02, 0.15, rd.y);

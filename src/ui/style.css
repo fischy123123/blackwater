@@ -214,3 +214,10 @@ body.is-touch .prompt { display: none; }
 
 .saved { position: absolute; right: max(4vw, 18px); bottom: max(4vh, calc(env(safe-area-inset-bottom) + 12px)); font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-faint); opacity: 0; transition: opacity 0.6s; }
 .saved.on { opacity: 1; }
+
+/* touch layout: keep hints clear of the corner buttons */
+body.is-touch .hint { left: calc(max(4vw, env(safe-area-inset-left) + 16px) + 60px); right: calc(max(4vw, env(safe-area-inset-right) + 16px) + 64px); max-width: none; text-align: left; }
+body.is-touch .card { left: calc(max(5vw, env(safe-area-inset-left) + 20px)); bottom: max(6vh, calc(env(safe-area-inset-bottom) + 14px)); right: 130px; }
+
+.rotate-hint { display: none; }
+@media (orientation: portrait) { body.is-touch .rotate-hint { display: inline; } }

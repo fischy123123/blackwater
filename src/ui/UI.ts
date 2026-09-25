@@ -82,7 +82,7 @@ export class UI {
           <button class="btn ghost" id="btn-settings">Settings</button>
         </div>
         <p class="title-note"><span class="desk">Mouse &amp; keyboard or controller · WASD to walk · E to interact · F flashlight</span><span class="mob">Drag the left side to walk · drag the right side to look · tap things to use them</span></p>
-        <p class="title-note small">Best with headphones</p>
+        <p class="title-note small">Best with headphones<span class="rotate-hint"> · turn your phone sideways</span></p>
       </div>`;
     this.root.appendChild(this.title);
 
@@ -235,7 +235,8 @@ export class UI {
 
   setTouchUI(on: boolean) {
     this.touchUI = on;
-    this.touch.classList.toggle('hidden', !on);
+    // on-screen controls only once play has begun
+    this.touch.classList.toggle('hidden', !on || this.hud.classList.contains('hidden'));
     document.body.classList.toggle('is-touch', on);
   }
 
@@ -267,6 +268,7 @@ export class UI {
     this.title.classList.add('out');
     setTimeout(() => this.title.classList.add('hidden'), 1500);
     this.hud.classList.remove('hidden');
+    if (this.touchUI) this.touch.classList.remove('hidden');
   }
 
   // ---------------------------------------------------------------- HUD

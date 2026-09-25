@@ -80,6 +80,15 @@ export class Game {
     };
     this.interaction = new Interaction(this.input, ui, world.collision, engine.camera);
     this.interaction.enabled = false;
+    // on touch screens a tap lowers the binoculars
+    const tapUse = this.input.onTap;
+    this.input.onTap = (x, y) => {
+      if (this.mode === 'binoc') {
+        this.endBinoculars();
+        return;
+      }
+      tapUse?.(x, y);
+    };
     this.dialogue = new Dialogue(ui);
 
     // the county pickup
@@ -255,6 +264,12 @@ export class Game {
   }
 
   // ---------------------------------------------------------------- helpers
+  /** Vertical FOV that keeps a usable horizontal view on portrait screens. */
+  naturalFov(base: number) {
+    const aspect = this.engine.camera.aspect;
+    return aspect < 1 ? base + (1 - aspect) * 34 : base;
+  }
+
   private updateInside(dt: number) {
     const p = this.player.pos;
     let id: string | null = null;
@@ -312,6 +327,7 @@ export class Game {
       cam.rotation.set(this.flyPitch, this.flyYaw, 0, 'YXZ');
       cam.updateMatrixWorld();
     } else if (this.mode === 'walk' || this.mode === 'cutscene') {
+      this.player.baseFov = this.naturalFov(66);
       this.player.update(dt, env.preExposure);
     } else if (this.mode === 'drive') {
       this.updateDrive(dt);
@@ -383,8 +399,9 @@ export class Game {
     // bumps
     const sp = Math.abs(t.speed);
     cam.position.y += Math.sin(this.time * 17) * 0.004 * Math.min(1, sp / 8) * (1 + t.surfaceRough(t.pos.x, t.pos.z) * 3);
-    if (Math.abs(cam.fov - 64) > 0.01) {
-      cam.fov = 64;
+    const cabFov = this.naturalFov(64);
+    if (Math.abs(cam.fov - cabFov) > 0.01) {
+      cam.fov = cabFov;
       cam.updateProjectionMatrix();
     }
     cam.updateMatrixWorld();

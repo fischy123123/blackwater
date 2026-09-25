@@ -55,6 +55,7 @@ export class Story {
   private crowd: THREE.InstancedMesh | null = null;
   private crowdData: { x: number; z: number; yaw: number; turn: number; delay: number; s: number }[] = [];
   private crowdFade = 0;
+  private spray: THREE.Mesh | null = null;
   private figureMats: THREE.MeshStandardMaterial[] = [];
   private gateCollider: import('../world/Collision').Box | null = null;
   private gateOpen = 0;
@@ -70,6 +71,7 @@ export class Story {
     this.computeRoadblockSpot();
     this.setupGate();
     this.setupCrowd();
+    this.setupSpray();
     this.assignFeeders();
     this.buildInteractables();
     // figures on the flats fade individually as you approach
@@ -216,6 +218,62 @@ export class Story {
     this.crowd.frustumCulled = false;
     this.game.engine.scene.add(this.crowd);
     this.updateCrowd(0);
+  }
+
+  /** A curtain of spray and mist riding the flood front. */
+  private setupSpray() {
+    const n = 160;
+    const g = new THREE.InstancedBufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], 3));
+    g.setIndex([0, 1, 2, 0, 2, 3]);
+    const off = new Float32Array(n * 4);
+    const rng = new RNG(77);
+    for (let i = 0; i < n; i++) off.set([rng.next(), rng.next(), rng.next(), rng.next()], i * 4);
+    g.setAttribute('aOff', new THREE.InstancedBufferAttribute(off, 4));
+    g.instanceCount = n;
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: /* glsl */ `
+        attribute vec4 aOff;
+        uniform float uFrontZ;
+        uniform float uCrest;
+        uniform float uT;
+        varying vec2 vUv;
+        varying float vA;
+        void main() {
+          float ph = fract(uT * 0.12 + aOff.w);
+          vec3 c = vec3(-720.0 + aOff.x * 1150.0, uCrest + aOff.z * 6.0 + ph * 16.0, uFrontZ + 4.0 + aOff.y * 26.0 + ph * 10.0);
+          float size = 9.0 + aOff.z * 14.0 + ph * 12.0;
+          vec3 toCam = normalize(cameraPosition - c);
+          vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), toCam));
+          vec3 up = cross(toCam, right);
+          vec3 wp = c + (right * position.x + up * position.y) * size;
+          vUv = position.xy;
+          vA = sin(ph * 3.14159);
+          gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uAmbient;
+        uniform vec3 uSunColor;
+        uniform float uAmount;
+        varying vec2 vUv;
+        varying float vA;
+        void main() {
+          float r = dot(vUv, vUv);
+          float a = exp(-r * 3.2) * vA * uAmount * 0.32;
+          if (a < 0.004) discard;
+          vec3 col = uAmbient * 2.6 + uSunColor * 0.035;
+          gl_FragColor = vec4(col, a);
+        }`,
+      uniforms: { uFrontZ: { value: 1e6 }, uCrest: { value: -10 }, uT: { value: 0 }, uAmount: { value: 0 }, uAmbient: U.uAmbient, uSunColor: U.uSunColor },
+      transparent: true,
+      depthWrite: false,
+    });
+    this.spray = new THREE.Mesh(g, mat);
+    this.spray.frustumCulled = false;
+    this.spray.layers.set(LAYER.TRANSPARENT);
+    this.spray.renderOrder = 30;
+    this.spray.visible = false;
+    this.game.engine.scene.add(this.spray);
   }
 
   private updateCrowd(dt: number) {
@@ -696,7 +754,7 @@ export class Story {
       () => this.game.insideId === 'relayhut',
       () => {
         if (!this.flags.power) this.say('Main breaker’s tripped. There’s a note on the panel.');
-        if (this.env.targetTime < 16.55) this.env.setTime(16.62, 90);
+        if (this.env.targetTime < 16.5) this.env.setTime(16.55, 90);
       },
     );
   }
@@ -1024,7 +1082,8 @@ export class Story {
     this.checkpointLater('power', 16);
     music.stopAll();
     this.after(1.5, () => music.cue('power'));
-    if (this.env.targetTime < 16.62) this.env.setTime(16.62, 30);
+    // dusk falls as the lamps warm up: sodium only reads a few degrees below the horizon
+    if (this.env.targetTime < 16.95) this.env.setTime(16.95, 35);
     this.env.timeRate = 0;
     // the sheriff's door buzzes open
     const door = this.game.doors.get('sheriff-door');
@@ -1169,6 +1228,7 @@ export class Story {
     });
     this.after(13, () => {
       this.collapseOn = true;
+      this.env.setWeather('surge', 10);
       this.player.shake = 1;
       music.cue('escape');
       this.say('It’s letting go.');
@@ -1286,6 +1346,7 @@ export class Story {
     const pl = this.w.places;
     // reset transient state
     this.front = { z: 1e6, active: false, speed: 0 };
+    if (this.spray) this.spray.visible = false;
     this.touchT = -1;
     this.collapse = 0;
     this.collapseOn = false;
@@ -1324,7 +1385,7 @@ export class Story {
     const tw: Record<Checkpoint, [number, keyof typeof WEATHER_PRESETS]> = {
       overlook: [15.55, 'golden'],
       town: [15.95, 'golden'],
-      power: [16.75, 'gathering'],
+      power: [16.95, 'gathering'],
       key: [17.4, 'storm'],
       lighthouse: [17.9, 'storm'],
       dawn: [7.15, 'dawn'],
@@ -1376,6 +1437,7 @@ export class Story {
     this.gateOpen = F.gateOpen ? 1 : 0;
     // lens
     this.lensSpeed = F.lensFixed ? 0.9 : 0;
+    this.beamLevel = 0.25 + 0.75 * smoothstep(4, -6, Math.asin(env.sunDir.y) / DEG);
     // wall, figures, crowd, sea
     pl.wall.visible = at('wall');
     pl.figures.visible = at('dawn');
@@ -1545,7 +1607,7 @@ export class Story {
     const beamTarget = (0.25 + 0.75 * night) * (this.flags.touched ? 0.5 : 1);
     this.beamLevel = damp(this.beamLevel, beamTarget, 1, dt);
     const bu = (pl.lighthouse.beams.material as THREE.ShaderMaterial).uniforms;
-    if (bu.uIntensity) bu.uIntensity.value = this.beamLevel * env.preExposure * 0.02;
+    if (bu.uIntensity) bu.uIntensity.value = this.beamLevel * env.preExposure * 0.1;
     const bull = lens.userData.bullseye as THREE.MeshStandardMaterial;
     bull.emissiveIntensity = 60 * env.preExposure * (0.4 + night);
     // weather-driven audio accent: foghorn in the fog at dawn, bell buoy
@@ -1615,9 +1677,18 @@ export class Story {
     this.front.speed = damp(this.front.speed, speed, 1.5, dt);
     this.front.z -= this.front.speed * dt;
     sm.uniforms.uFrontZ.value = this.front.z;
-    sm.uniforms.uBoreH.value = this.front.z > 260 ? 4.5 : Math.max(0, (this.front.z - 150) / 110) * 4.5;
+    sm.uniforms.uBoreH.value = this.front.z > 260 ? 14 : Math.max(0, (this.front.z - 150) / 110) * 14;
     this.seaLevel = Math.min(0.2, this.seaLevel + dt * 0.25);
     sm.uniforms.uSeaLevel.value = this.seaLevel;
+    if (this.spray) {
+      const su = (this.spray.material as THREE.ShaderMaterial).uniforms;
+      const boreH = sm.uniforms.uBoreH.value as number;
+      this.spray.visible = boreH > 0.5;
+      su.uFrontZ.value = this.front.z;
+      su.uCrest.value = this.w.terrain.heightAt(this.player.pos.x, this.front.z + 8) + boreH * 0.55;
+      su.uT.value += dt;
+      su.uAmount.value = Math.min(1, boreH / 8);
+    }
     if (this.front.z < 700) this.w.water.flats.visible = false;
     // caught?
     if (!onTower && gap > -1.5 && this.gameOverT < 0 && this.player.pos.y < this.w.terrain.heightAt(this.player.pos.x, pz) + 3) this.gameOver();

@@ -71,6 +71,8 @@ export function buildRoads(t: TerrainData, tex: { asphalt: { map: THREE.Texture;
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -4,
     });
+    // asphalt aggregate is fine-grained: keep the bump subtle (gravel stays rough)
+    mat.normalScale.setScalar(gravel ? 1.0 : 0.35);
     patchRoad(mat, { width: r.width, total, lines: r.lines, gravel, id: r.id });
     const m = new THREE.Mesh(g, mat);
     m.receiveShadow = true;

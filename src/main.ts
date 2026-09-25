@@ -138,9 +138,22 @@ async function boot() {
   setTimeout(() => ui.showTitle(!!save), 400);
 
   let started = false;
+  // keyboard / controller can start from the title too
+  const titleKeys = (e: KeyboardEvent) => {
+    if (game.mode === 'title' && !ui.paused && (e.code === 'Enter' || e.code === 'Space')) ui.onBegin?.(!!save);
+  };
+  addEventListener('keydown', titleKeys);
+  game.onUpdate.push(() => {
+    if (game.mode !== 'title' || ui.paused) return;
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const p of pads) if (p && p.connected && (p.buttons[0]?.pressed || p.buttons[9]?.pressed)) ui.onBegin?.(!!save);
+  });
   ui.onBegin = async (cont) => {
     if (started) return;
     started = true;
+    // pointer lock must be requested synchronously inside the user gesture
+    game.input.wantsLock = !game.input.touchMode;
+    if (game.input.wantsLock) game.input.requestLock();
     await audio.start().catch(() => void 0);
     applySettings();
     game.startAudio();
@@ -156,9 +169,8 @@ async function boot() {
     story.start(cp);
     world.sky.renderAll();
     world.terrain.updateShadow(engine.renderer, world.env.sunDir, true);
-    game.input.wantsLock = !game.input.touchMode;
-    if (game.input.wantsLock) game.input.requestLock();
     engine.pipeline.resetExposure();
+    if (game.input.wantsLock && !game.input.pointerLocked) ui.showHint('Click to look around', 4);
   };
 
   // ------------------------------------------------------------------ pause / notebook / pointer lock

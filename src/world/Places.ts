@@ -39,9 +39,11 @@ export type PlacesResult = {
 // --------------------------------------------------------------------------- beam shader
 const BEAM_VERT = /* glsl */ `
 varying vec3 vLocal;
+varying vec3 vCamLocal;
 varying vec3 vWorld;
 void main() {
   vLocal = position;
+  vCamLocal = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz;
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vWorld = wp.xyz;
   gl_Position = projectionMatrix * viewMatrix * wp;
@@ -51,20 +53,29 @@ ${GLSL_FOG_UNIFORMS}
 ${GLSL_FOG_FN}
 uniform float uIntensity;
 uniform float uLen;
+uniform float uRain;
 varying vec3 vLocal;
+varying vec3 vCamLocal;
 varying vec3 vWorld;
 void main() {
-  // local: x along the beam (0..len), y/z across
-  float t = clamp(vLocal.x / uLen, 0.0, 1.0);
-  float r = length(vLocal.yz) / (0.35 + t * uLen * 0.07);
-  float core = exp(-r * r * 2.6);
-  float along = (1.0 - t) * (1.0 - t) * smoothstep(0.0, 0.02, t);
-  vec3 V = normalize(vWorld - cameraPosition);
-  // brighter when looking down the beam
-  float scatterDensity = uFogDensity * 400.0 + uMist * 60.0 + uBankDensity * 30.0 + 0.25;
-  vec3 col = vec3(1.0, 0.93, 0.78) * core * along * uIntensity * scatterDensity;
+  // closest approach of the view ray to the beam axis (local +x)
+  vec3 o = vCamLocal;
+  vec3 d = normalize(vLocal - o);
+  float dd = max(dot(d.yz, d.yz), 1e-6);
+  float s = max(-dot(o.yz, d.yz) / dd, 0.0);
+  vec3 c = o + d * s;
+  float t = clamp(c.x / uLen, 0.0, 1.0);
+  float rad = 0.4 + t * 21.6;
+  float dmin = length(c.yz);
+  float core = exp(-(dmin * dmin) / (rad * rad) * 3.0);
+  float along = pow(1.0 - t, 1.7) * smoothstep(0.0, 0.004, c.x / uLen);
+  // brighter looking back up the beam toward the lamp (forward scattering in rain and fog)
+  float toward = max(-d.x, 0.0);
+  float ph = 1.0 + 4.0 * pow(toward, 10.0);
+  float scatterDensity = uFogDensity * 400.0 + uMist * 60.0 + uBankDensity * 30.0 + uRain * 1.2 + 0.2;
+  vec3 col = vec3(1.0, 0.93, 0.78) * core * along * ph * uIntensity * scatterDensity / (1.0 + rad * 0.08);
   vec4 f = bwFogSegment(cameraPosition, vWorld);
-  gl_FragColor = vec4(col * (0.4 + 0.6 * f.a), 1.0);
+  gl_FragColor = vec4(col * (0.35 + 0.65 * f.a) * 0.5, 1.0);
 }`;
 
 // --------------------------------------------------------------------------- the wall of water
@@ -420,13 +431,13 @@ export function buildPlaces(scene: THREE.Scene, collision: CollisionWorld, light
   group.add(lens);
   lights.add({ id: 'lighthouse-lamp', group: 'lighthouse', pos: V(lb.x, lb.y + TH + 1.8, lb.z), kind: 'incandescent', power: 3.0, range: 40, glowSize: 1.2 });
   // beams (two opposing cones)
-  const beamGeo = new THREE.CylinderGeometry(0.4, 22, 500, 18, 12, true);
+  const beamGeo = new THREE.CylinderGeometry(22, 0.4, 500, 18, 12, true); // narrow at the lamp
   beamGeo.rotateZ(-Math.PI / 2);
   beamGeo.translate(250, 0, 0);
   const beamMat = new THREE.ShaderMaterial({
     vertexShader: BEAM_VERT,
     fragmentShader: BEAM_FRAG,
-    uniforms: { ...fogUniforms(), uIntensity: { value: 0 }, uLen: { value: 500 } },
+    uniforms: { ...fogUniforms(), uIntensity: { value: 0 }, uLen: { value: 500 }, uRain: U.uRain },
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
@@ -733,10 +744,12 @@ export function buildPlaces(scene: THREE.Scene, collision: CollisionWorld, light
         [cx, cz] = legs2[(i + 1) % 4];
       b.beam('metal', V(tb.x + ax * 1.05, tb.y + TT + 1.0, tb.z + az * 1.05), V(tb.x + cx * 1.05, tb.y + TT + 1.0, tb.z + cz * 1.05), 0.05, 0.05);
     }
-    // daymark + light
+    // daymark mast (above head height so the view from the platform stays clear) + light
+    b.color.setRGB(0.3, 0.32, 0.3);
+    b.beam('metal', V(tb.x + 1.2, tb.y + TT, tb.z + 1.2), V(tb.x + 1.2, tb.y + TT + 4.6, tb.z + 1.2), 0.08, 0.08);
     b.color.setRGB(0.15, 0.45, 0.22);
-    b.box('metal', tb.x, tb.y + TT + 2.2, tb.z, 1.6, 2.0, 0.06, 1);
-    lights.add({ id: 'escape-light', group: 'range', pos: V(tb.x, tb.y + TT + 3.5, tb.z), kind: 'mercury', power: 0.6, range: 20, glowSize: 0.6, castLight: false });
+    b.box('metal', tb.x + 1.2, tb.y + TT + 3.6, tb.z + 1.2, 1.2, 1.4, 0.06, 1);
+    lights.add({ id: 'escape-light', group: 'range', pos: V(tb.x + 1.2, tb.y + TT + 4.8, tb.z + 1.2), kind: 'mercury', power: 0.6, range: 20, glowSize: 0.6, castLight: false });
     // ladder on the north face
     const lz = tb.z - 1.25;
     for (const lx of [-0.25, 0.25]) b.beam('metal', V(tb.x + lx, tb.y, lz), V(tb.x + lx, tb.y + TT + 1, lz + 0.4), 0.04, 0.04);

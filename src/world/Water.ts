@@ -27,7 +27,10 @@ void main() {
     float d = wp.z - uFrontZ;
     float g = bwTerrainHeight(wp.xz);
     // a breaking bore at the leading edge, then a sheet that thins toward the back
-    float bore = uBoreH * smoothstep(-3.0, 12.0, d) * (1.0 - smoothstep(12.0, 170.0, d));
+    // a breaking surge: steep face, long back; tallest near the wall, easing as it runs inland
+    float bh = uBoreH * (0.45 + 0.55 * smoothstep(300.0, 1100.0, uFrontZ));
+    float bore = bh * smoothstep(-3.0, 9.0, d) * (1.0 - smoothstep(9.0, 190.0, d));
+    bore += bh * 0.25 * sin(d * 0.08 - uTime * 2.0) * smoothstep(8.0, 30.0, d) * (1.0 - smoothstep(30.0, 220.0, d));
     bore += 0.35 * smoothstep(-3.0, 4.0, d) * (1.0 - smoothstep(60.0, 260.0, d));
     bore += sin(wp.x * 0.05 + uTime * 1.3) * 0.4 * uBoreH * 0.25 * smoothstep(0.0, 20.0, d) * (1.0 - smoothstep(20.0, 200.0, d));
     float surf = max(uSeaLevel, g + bore);
@@ -140,6 +143,13 @@ void main() {
   vec3 T = exp(-uAbsorb * (thickR * 0.6 + depthV * 0.4));
   vec3 inscat = uScatter * uAmbient * (1.0 - T);
   vec3 refr = under * T + inscat;
+  if (uFlood > 0.5) {
+    // the returning sea is churned and opaque with sand
+    float fdz = vWorld.z - uFrontZ;
+    float turb = 1.0 - smoothstep(150.0, 700.0, fdz);
+    vec3 turbid = vec3(0.09, 0.15, 0.13) * (uAmbient * 2.2 + uSunColor * max(uSunDir.y, 0.0) * 0.1);
+    refr = mix(refr, turbid, turb * 0.9);
+  }
 
   // Reflection
   vec3 R = reflect(-V, N);
@@ -211,10 +221,11 @@ void main() {
   if (uFlood > 0.5) {
     float fd = vWorld.z - uFrontZ;
     float churn = bwFbm(vWorld.xz * vec2(0.15, 0.3) + vec2(0.0, uTime * 2.0));
-    float ff = smoothstep(90.0, 0.0, fd) * (0.55 + 0.6 * churn) + smoothstep(250.0, 60.0, fd) * 0.35 * smoothstep(0.55, 0.8, churn);
+    float ff = smoothstep(70.0, 0.0, fd) * (0.7 + 0.5 * churn) + smoothstep(260.0, 50.0, fd) * 0.45 * smoothstep(0.5, 0.8, churn);
     foam = clamp(max(foam, ff), 0.0, 1.0);
   }
-  col = mix(col, (uAmbient * 0.9 + uSunColor * max(uSunDir.y, 0.0) * 0.25) * 0.85, foam * 0.85);
+  vec3 foamCol = uFlood > 0.5 ? (uAmbient * 1.9 + uSunColor * max(uSunDir.y, 0.06) * 0.32) : (uAmbient * 0.9 + uSunColor * max(uSunDir.y, 0.0) * 0.25) * 0.85;
+  col = mix(col, foamCol, foam * (uFlood > 0.5 ? 0.95 : 0.85));
   col = bwApplyFog(col, vWorld);
   // soft shoreline alpha
   float alpha = clamp(thick * 6.0, 0.0, 1.0);
